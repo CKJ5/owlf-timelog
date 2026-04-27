@@ -5,6 +5,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -430,17 +431,18 @@ body.light .work-chip-btn.act-work{background:rgba(223,182,126,.13);box-shadow:0
 <!-- ════════════════════════════════════════════════════════════ -->
 <script>
 <script>
-// ═══ SERVICE WORKER — Offline + Notifications ═══
+// ═══ SERVICE WORKER ═══
 window._swReg=null;
-const OWLF_CACHE='owlf-v3';
 function tryRegisterSW(){
   if(!('serviceWorker' in navigator))return;
-  navigator.serviceWorker.register('./sw.js', {scope:'./'}).then(reg=>{
-    window._swReg=reg;
-    console.log('SW registered');
-  }).catch(err=>console.log('SW failed:',err));
+  navigator.serviceWorker.register('./sw.js',{scope:'./'})
+    .then(reg=>{
+      window._swReg=reg;
+      console.log('OWLF SW registered ✓');
+    })
+    .catch(err=>console.log('OWLF SW failed:',err));
 }
-tryRegisterSW();
+document.addEventListener('DOMContentLoaded',tryRegisterSW);
 
 // ═══ PWA INSTALL PROMPT ═══
 let _installPrompt=null;

@@ -645,6 +645,21 @@ function installPWA(){
           <button onclick="document.getElementById('imp-file').click()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">↓ Import</button>
           <input type="file" id="imp-file" accept=".json" style="display:none" onchange="importData(event)">
         </div>
+
+        <div style="margin-top:10px">
+  <div class="mlbl" style="margin-bottom:6px">Auto Backup to Google Drive</div>
+  <button onclick="connectGoogleDrive()" id="gdrive-connect-btn" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid #4285f4;background:var(--bg3);color:#4285f4;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;cursor:pointer;text-align:left">
+    🔗 Connect Google Drive
+  </button>
+  <div style="display:flex;gap:8px;margin-top:6px">
+    <button onclick="backupNow()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">☁ Backup Now</button>
+    <button onclick="toggleAutoBackup()" id="auto-backup-btn" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">⏰ Auto: OFF</button>
+  </div>
+  <div id="gdrive-status" style="font-size:11px;color:var(--muted);margin-top:5px;padding:0 2px"></div>
+</div>
+
+
+        
         <button onclick="clearAllData()" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid #c0392b;background:transparent;color:#c0392b;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;cursor:pointer">🗑 Clear All Data</button>
       </div>
     </div>
@@ -1775,6 +1790,130 @@ function importData(e){
   r.readAsText(f);e.target.value='';
 }
 
+
+  // ═══ GOOGLE DRIVE BACKUP ═══
+const GDRIVE_CLIENT_ID = '444516554695-rimfoaoel6r3abotuhaaabar7e05891h.apps.googleusercontent.com'; // <-- fill this in
+const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+let _gdriveToken = null;
+let _autoBackupTimer = null;
+
+function gdriveStatus(msg, color){
+  const el = document.getElementById('gdrive-status');
+  if(el){el.textContent = msg; el.style.color = color||'var(--muted)';}
+}
+
+function connectGoogleDrive(){
+  const url = `https://accounts.google.com/o/oauth2/v2/auth`
+    + `?client_id=${GDRIVE_CLIENT_ID}`
+    + `&redirect_uri=${encodeURIComponent(location.origin + location.pathname)}`
+    + `&response_type=token`
+    + `&scope=${encodeURIComponent(GDRIVE_SCOPE)}`;
+  window.open(url, '_blank', 'width=500,height=600');
+  gdriveStatus('Waiting for Google login...', 'var(--work)');
+}
+
+// Handle OAuth redirect token
+(function(){
+  const hash = location.hash;
+  if(hash.includes('access_token')){
+    const params = new URLSearchParams(hash.slice(1));
+    _gdriveToken = params.get('access_token');
+    S.gdriveToken = _gdriveToken;
+    save();
+    location.hash = '';
+    gdriveStatus('✓ Google Drive connected!', '#27ae60');
+    const btn = document.getElementById('gdrive-connect-btn');
+    if(btn){btn.textContent = '✓ Connected'; btn.style.borderColor = '#27ae60'; btn.style.color = '#27ae60';}
+  } else if(S.gdriveToken){
+    _gdriveToken = S.gdriveToken;
+    const btn = document.getElementById('gdrive-connect-btn');
+    if(btn){btn.textContent = '✓ Connected'; btn.style.borderColor = '#27ae60'; btn.style.color = '#27ae60';}
+  }
+})();
+
+async function backupNow(){
+  if(!_gdriveToken){gdriveStatus('⚠ Connect Google Drive first', '#e74c3c');return;}
+  gdriveStatus('Uploading...', 'var(--work)');
+  const data = JSON.stringify(S, null, 2);
+  const date = tk();
+  const filename = `owlf-backup-${date}.json`;
+  try{
+    // Search for existing file to update
+    const search = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name='owlf-backup-latest.json'&spaces=drive`,
+      {headers:{Authorization:`Bearer ${_gdriveToken}`}}
+    );
+    const searchRes = await search.json();
+    const existingId = searchRes.files && searchRes.files[0] && searchRes.files[0].id;
+
+    const meta = {name:'owlf-backup-latest.json', mimeType:'application/json'};
+    const blob = new Blob([data], {type:'application/json'});
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(meta)], {type:'application/json'}));
+    form.append('file', blob);
+
+    const method = existingId ? 'PATCH' : 'POST';
+    const url = existingId
+      ? `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart`
+      : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+
+    const res = await fetch(url, {
+      method,
+      headers:{Authorization:`Bearer ${_gdriveToken}`},
+      body: form
+    });
+    if(res.ok){
+      S.lastBackup = new Date().toLocaleString();
+      save();
+      gdriveStatus(`✓ Backed up at ${S.lastBackup}`, '#27ae60');
+    } else {
+      const err = await res.json();
+      if(err.error && err.error.code === 401){
+        _gdriveToken = null; S.gdriveToken = null; save();
+        gdriveStatus('⚠ Token expired — reconnect Drive', '#e74c3c');
+      } else {
+        gdriveStatus('⚠ Upload failed: ' + (err.error&&err.error.message||res.status), '#e74c3c');
+      }
+    }
+  } catch(e){
+    gdriveStatus('⚠ Network error — check connection', '#e74c3c');
+  }
+}
+
+function toggleAutoBackup(){
+  S.autoBackup = !S.autoBackup;
+  save();
+  const btn = document.getElementById('auto-backup-btn');
+  if(S.autoBackup){
+    if(btn){btn.textContent='⏰ Auto: ON';btn.style.color='var(--work)';}
+    scheduleAutoBackup();
+  } else {
+    if(btn){btn.textContent='⏰ Auto: OFF';btn.style.color='var(--muted)';}
+    if(_autoBackupTimer)clearInterval(_autoBackupTimer);
+  }
+}
+
+function scheduleAutoBackup(){
+  if(_autoBackupTimer)clearInterval(_autoBackupTimer);
+  if(!S.autoBackup)return;
+  // Backup every 24 hours
+  _autoBackupTimer = setInterval(()=>{
+    const now = myDate();
+    if(now.getUTCHours() === 2){ // 2am MYT daily
+      backupNow();
+    }
+  }, 60*60*1000); // check every hour
+}
+
+// Init auto backup on load
+if(S.autoBackup && S.gdriveToken){
+  _gdriveToken = S.gdriveToken;
+  scheduleAutoBackup();
+  const btn = document.getElementById('auto-backup-btn');
+  if(btn){btn.textContent='⏰ Auto: ON';btn.style.color='var(--work)';}
+}
+
+  
 // ═══ UI UPDATES ═══
 function updateWorkUI(){
   const d=getToday();

@@ -1243,6 +1243,7 @@ function showSettings(){
   updateSettingsWeekStart();
   renderPtypeChips();
   renderStylePicker();
+  updateGdriveUI(); // add this line
   document.getElementById('settings-overlay').classList.remove('hidden');
 }
 function updateSettingsUI(){renderStylePicker();}
@@ -1792,126 +1793,155 @@ function importData(e){
 
 
   // ═══ GOOGLE DRIVE BACKUP ═══
-const GDRIVE_CLIENT_ID = '444516554695-rimfoaoel6r3abotuhaaabar7e05891h.apps.googleusercontent.com'; // <-- fill this in
+const GDRIVE_CLIENT_ID = 'YOUR_CLIENT_ID_HERE';
 const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 let _gdriveToken = null;
 let _autoBackupTimer = null;
 
 function gdriveStatus(msg, color){
   const el = document.getElementById('gdrive-status');
-  if(el){el.textContent = msg; el.style.color = color||'var(--muted)';}
+  if(el){el.textContent=msg; el.style.color=color||'var(--muted)';}
 }
 
 function connectGoogleDrive(){
-  const url = `https://accounts.google.com/o/oauth2/v2/auth`
-    + `?client_id=${GDRIVE_CLIENT_ID}`
-    + `&redirect_uri=${encodeURIComponent(location.origin + location.pathname)}`
-    + `&response_type=token`
-    + `&scope=${encodeURIComponent(GDRIVE_SCOPE)}`;
+  const url = 'https://accounts.google.com/o/oauth2/v2/auth'
+    + '?client_id=' + GDRIVE_CLIENT_ID
+    + '&redirect_uri=' + encodeURIComponent(location.origin + location.pathname)
+    + '&response_type=token'
+    + '&scope=' + encodeURIComponent(GDRIVE_SCOPE);
   window.open(url, '_blank', 'width=500,height=600');
   gdriveStatus('Waiting for Google login...', 'var(--work)');
 }
 
-// Handle OAuth redirect token
+// Handle OAuth redirect — runs once on load, never touches S
 (function(){
   const hash = location.hash;
   if(hash.includes('access_token')){
     const params = new URLSearchParams(hash.slice(1));
-    _gdriveToken = params.get('access_token');
-    S.gdriveToken = _gdriveToken;
-    save();
-    location.hash = '';
-    gdriveStatus('✓ Google Drive connected!', '#27ae60');
-    const btn = document.getElementById('gdrive-connect-btn');
-    if(btn){btn.textContent = '✓ Connected'; btn.style.borderColor = '#27ae60'; btn.style.color = '#27ae60';}
-  } else if(S.gdriveToken){
-    _gdriveToken = S.gdriveToken;
-    const btn = document.getElementById('gdrive-connect-btn');
-    if(btn){btn.textContent = '✓ Connected'; btn.style.borderColor = '#27ae60'; btn.style.color = '#27ae60';}
+    const token = params.get('access_token');
+    if(token){
+      _gdriveToken = token;
+      localStorage.setItem('owlf_gdrive_token', token);
+      history.replaceState(null, '', location.pathname); // clean URL without reload
+      setTimeout(()=>{
+        gdriveStatus('✓ Google Drive connected!', '#27ae60');
+        const btn = document.getElementById('gdrive-connect-btn');
+        if(btn){btn.textContent='✓ Connected';btn.style.borderColor='#27ae60';btn.style.color='#27ae60';}
+      }, 500);
+    }
+  } else {
+    const saved = localStorage.getItem('owlf_gdrive_token');
+    if(saved) _gdriveToken = saved;
   }
 })();
 
+// Update connect button state on settings open
+function updateGdriveUI(){
+  const btn = document.getElementById('gdrive-connect-btn');
+  const autoBtn = document.getElementById('auto-backup-btn');
+  const lastBackup = localStorage.getItem('owlf_last_backup');
+  const isAuto = localStorage.getItem('owlf_auto_backup') === '1';
+  if(_gdriveToken){
+    if(btn){btn.textContent='✓ Connected';btn.style.borderColor='#27ae60';btn.style.color='#27ae60';}
+  } else {
+    if(btn){btn.textContent='🔗 Connect Google Drive';btn.style.borderColor='#4285f4';btn.style.color='#4285f4';}
+  }
+  if(autoBtn){
+    autoBtn.textContent = isAuto ? '⏰ Auto: ON' : '⏰ Auto: OFF';
+    autoBtn.style.color = isAuto ? 'var(--work)' : 'var(--muted)';
+  }
+  if(lastBackup){
+    gdriveStatus('Last backup: ' + lastBackup);
+  }
+}
+
 async function backupNow(){
-  if(!_gdriveToken){gdriveStatus('⚠ Connect Google Drive first', '#e74c3c');return;}
+  if(!_gdriveToken){
+    // Try loading from storage one more time
+    _gdriveToken = localStorage.getItem('owlf_gdrive_token');
+    if(!_gdriveToken){gdriveStatus('⚠ Connect Google Drive first', '#e74c3c');return;}
+  }
   gdriveStatus('Uploading...', 'var(--work)');
   const data = JSON.stringify(S, null, 2);
-  const date = tk();
-  const filename = `owlf-backup-${date}.json`;
   try{
-    // Search for existing file to update
+    // Find existing file
     const search = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=name='owlf-backup-latest.json'&spaces=drive`,
-      {headers:{Authorization:`Bearer ${_gdriveToken}`}}
+      'https://www.googleapis.com/drive/v3/files?q=name%3D%27owlf-backup-latest.json%27&spaces=drive',
+      {headers:{Authorization:'Bearer ' + _gdriveToken}}
     );
+    if(search.status === 401){
+      _gdriveToken = null;
+      localStorage.removeItem('owlf_gdrive_token');
+      gdriveStatus('⚠ Session expired — reconnect Drive', '#e74c3c');
+      updateGdriveUI();
+      return;
+    }
     const searchRes = await search.json();
     const existingId = searchRes.files && searchRes.files[0] && searchRes.files[0].id;
 
     const meta = {name:'owlf-backup-latest.json', mimeType:'application/json'};
-    const blob = new Blob([data], {type:'application/json'});
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify(meta)], {type:'application/json'}));
-    form.append('file', blob);
+    form.append('file', new Blob([data], {type:'application/json'}));
 
     const method = existingId ? 'PATCH' : 'POST';
     const url = existingId
-      ? `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart`
-      : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+      ? 'https://www.googleapis.com/upload/drive/v3/files/' + existingId + '?uploadType=multipart'
+      : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
 
     const res = await fetch(url, {
       method,
-      headers:{Authorization:`Bearer ${_gdriveToken}`},
+      headers:{Authorization:'Bearer ' + _gdriveToken},
       body: form
     });
+
     if(res.ok){
-      S.lastBackup = new Date().toLocaleString();
-      save();
-      gdriveStatus(`✓ Backed up at ${S.lastBackup}`, '#27ae60');
+      const backupTime = new Date().toLocaleString();
+      localStorage.setItem('owlf_last_backup', backupTime);
+      gdriveStatus('✓ Backed up: ' + backupTime, '#27ae60');
+    } else if(res.status === 401){
+      _gdriveToken = null;
+      localStorage.removeItem('owlf_gdrive_token');
+      gdriveStatus('⚠ Session expired — reconnect Drive', '#e74c3c');
+      updateGdriveUI();
     } else {
-      const err = await res.json();
-      if(err.error && err.error.code === 401){
-        _gdriveToken = null; S.gdriveToken = null; save();
-        gdriveStatus('⚠ Token expired — reconnect Drive', '#e74c3c');
-      } else {
-        gdriveStatus('⚠ Upload failed: ' + (err.error&&err.error.message||res.status), '#e74c3c');
-      }
+      const err = await res.json().catch(()=>({}));
+      gdriveStatus('⚠ Failed: ' + (err.error&&err.error.message||res.status), '#e74c3c');
     }
   } catch(e){
-    gdriveStatus('⚠ Network error — check connection', '#e74c3c');
+    gdriveStatus('⚠ Network error', '#e74c3c');
   }
 }
 
 function toggleAutoBackup(){
-  S.autoBackup = !S.autoBackup;
-  save();
-  const btn = document.getElementById('auto-backup-btn');
-  if(S.autoBackup){
-    if(btn){btn.textContent='⏰ Auto: ON';btn.style.color='var(--work)';}
+  const cur = localStorage.getItem('owlf_auto_backup') === '1';
+  localStorage.setItem('owlf_auto_backup', cur ? '0' : '1');
+  updateGdriveUI();
+  if(!cur){
     scheduleAutoBackup();
   } else {
-    if(btn){btn.textContent='⏰ Auto: OFF';btn.style.color='var(--muted)';}
-    if(_autoBackupTimer)clearInterval(_autoBackupTimer);
+    if(_autoBackupTimer) clearInterval(_autoBackupTimer);
   }
 }
 
 function scheduleAutoBackup(){
-  if(_autoBackupTimer)clearInterval(_autoBackupTimer);
-  if(!S.autoBackup)return;
-  // Backup every 24 hours
+  if(_autoBackupTimer) clearInterval(_autoBackupTimer);
+  if(localStorage.getItem('owlf_auto_backup') !== '1') return;
+  // Check every hour, backup at 2am MYT
   _autoBackupTimer = setInterval(()=>{
     const now = myDate();
-    if(now.getUTCHours() === 2){ // 2am MYT daily
+    if(now.getUTCHours() === 2){
       backupNow();
     }
-  }, 60*60*1000); // check every hour
+  }, 60 * 60 * 1000);
 }
 
-// Init auto backup on load
-if(S.autoBackup && S.gdriveToken){
-  _gdriveToken = S.gdriveToken;
-  scheduleAutoBackup();
-  const btn = document.getElementById('auto-backup-btn');
-  if(btn){btn.textContent='⏰ Auto: ON';btn.style.color='var(--work)';}
-}
+// Init auto backup on app load
+(function(){
+  if(localStorage.getItem('owlf_auto_backup') === '1'){
+    scheduleAutoBackup();
+  }
+})();
 
   
 // ═══ UI UPDATES ═══

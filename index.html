@@ -1971,17 +1971,15 @@ function updateWorkUI(){
     document.getElementById('ws-'+type).textContent=fmt(d[type]||0);
   });
   // snake
-  const sa=S.active['snake'];
-  document.getElementById('btn-snake').className='toggle-btn'+(sa?' act-snake':'');
-  document.getElementById('snake-ct-today').textContent=d.snakeSessions||0;
-  document.getElementById('snake-dur-today').textContent=fmt(d.snakeDur||0);
-  document.getElementById('snake-sub').textContent=(d.snakeSessions||0)+' times today';
-  const moSn=Object.keys(S.daily).filter(k=>k.startsWith(mk())).reduce((s,k)=>s+(S.daily[k].snakeSessions||0),0);
-  const moSnDur=Object.keys(S.daily).filter(k=>k.startsWith(mk())).reduce((s,k)=>s+(S.daily[k].snakeDur||0),0);
-  document.getElementById('snake-ct-mo').textContent=moSn;
-  document.getElementById('snake-dur-mo').textContent=fmt(moSnDur);
-  document.getElementById('snake-avg-mo').textContent=fmt(moSn?Math.round(moSnDur/moSn):0);
-  document.getElementById('snake-mo-lbl').textContent=fmt(moSnDur)+' total this mo.';
+  const snakeActive = !!S.active['snake'];
+const snakeHdrLbl = document.getElementById('snake-hdr-lbl');
+if(snakeHdrLbl) snakeHdrLbl.style.color = snakeActive ? '#fff' : 'var(--snake)';
+const snakeCard = document.getElementById('snake-card');
+if(snakeCard) snakeCard.classList.toggle('card-active-fire', snakeActive);
+if(snakeActive) expandCardIfActive('snake-body','snake-collapse-arrow',true);
+
+
+  
   // proj summary
   // Type > Project tree in work card
   const sess=S.sessions[tk()]||[];

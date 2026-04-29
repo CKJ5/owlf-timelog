@@ -778,23 +778,26 @@ function installPWA(){
     <div class="proj-summary" id="proj-area"></div>
   </div>
 
-  <div class="card">
-    <div class="card-hdr"><span class="card-lbl" style="color:var(--snake)">Heavy</span><span class="tdisplay" id="snake-mo-lbl">0m total this mo.</span></div>
-    <button class="toggle-btn" id="btn-snake" onclick="toggleSnake()">
-      <div><div style="color:inherit">Heavy Session</div><div style="font-size:11px;color:var(--muted);margin-top:2px" id="snake-sub">0 times today</div></div>
-      <div class="ttimer" id="timer-snake">—</div>
-    </button>
+  <div class="card" id="snake-card">
+  <div class="card-hdr card-hdr-btn" onclick="toggleCardCollapse('snake-body','snake-collapse-arrow','snake-hdr-lbl')">
+    <span class="card-lbl" id="snake-hdr-lbl" style="color:var(--snake)">Heavy</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="tdisplay" id="snake-mo-lbl">0m total this mo.</span>
+      <span id="snake-collapse-arrow" style="font-size:12px;color:var(--muted)">▾</span>
+    </div>
+  </div>
+  <button class="toggle-btn" id="btn-snake" onclick="toggleSnake()">
+    <div><div style="color:inherit">Heavy Session</div><div style="font-size:11px;color:var(--muted);margin-top:2px" id="snake-sub">0 times today</div></div>
+    <div class="ttimer" id="timer-snake">—</div>
+  </button>
+  <div class="card-collapse-body" id="snake-body" style="max-height:0px">
     <div class="sr2">
       <div class="sbox"><div class="snum" style="color:var(--snake)" id="snake-ct-today">0</div><div class="slbl">Today Times</div></div>
       <div class="sbox"><div class="snum" style="color:var(--snake)" id="snake-dur-today">0m</div><div class="slbl">Today Total</div></div>
     </div>
-    <div class="sr3">
-      <div class="sbox"><div class="snum" style="color:var(--snake)" id="snake-ct-mo">0</div><div class="slbl">Mo. Times</div></div>
-      
-      <div class="sbox"><div class="snum" style="color:var(--snake)" id="snake-dur-mo">0</div><div class="slbl">Mo. Total</div></div>
-      
-      <div class="sbox"><div class="snum" style="color:var(--snake)" id="snake-avg-mo">0m</div><div class="slbl">Mo. Avg/Time</div></div>
-    </div>
+    
+    <!-- any other stats rows inside the card go here -->
+    
   </div>
 </div>
 

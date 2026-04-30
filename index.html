@@ -1466,8 +1466,8 @@ function updateTopStreak(){
   set('top-streak-num',nums[curPage]);
   set('top-streak-sub',subTexts[curPage]);
   setStyle('top-streak-num','color',['var(--work)','var(--life)','var(--ex)','var(--text)'][curPage]);
-set('top-streak-num',nums[0]);
-set('work-streak-sub',moWorkHits()+' hits this mo.');
+  set('work-streak-inline',nums[0]);
+  set('work-streak-sub',moWorkHits()+' hits this mo.');
   set('life-streak-inline',nums[1]);
   set('ex-streak-inline',(S.exercise&&S.exercise.streak)||0);
   set('ex-streak-sub',moExHits()+' hits this mo.');
@@ -2017,8 +2017,6 @@ function updateWorkUI(){
     document.getElementById('wproj-'+type).textContent=a?a.proj:'';
     if(!a)document.getElementById('wtimer-'+type).textContent='—';
     document.getElementById('ws-'+type).textContent=fmt(d[type]||0);
-
-    document.getElementById('work-streak-inline').textContent=nums[0];
   });
   // snake
   const sa=S.active['snake'];
@@ -2032,7 +2030,6 @@ function updateWorkUI(){
   document.getElementById('snake-dur-mo').textContent=fmt(moSnDur);
   document.getElementById('snake-avg-mo').textContent=fmt(moSn?Math.round(moSnDur/moSn):0);
   const _snMoLbl=document.getElementById('snake-mo-lbl');if(_snMoLbl)_snMoLbl.textContent=fmt(moSnDur)+' total this mo.';
-  
   // Snake card frame highlight
   const snakeCard=document.getElementById('snake-card');
   if(snakeCard){snakeCard.classList.toggle('card-active-fire',!!sa);}

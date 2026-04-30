@@ -1576,7 +1576,7 @@ function startWork(type){
 }
 function stopWork(type,startTs){
   const el=elMin(startTs),wst=parseFloat(document.getElementById('w-wst')?.value)||0,net=Math.max(0,el-wst);
-  const d=getToday();d[type]=(d[type]||0)+net;d.wasted[type]=(d.wasted[type]||0)+wst;
+  const d=getToday();d[type]=(d[type]||0)+net;if(!d.wasted)d.wasted={design:0,games:0,clients:0};d.wasted[type]=(d.wasted[type]||0)+wst;
   const proj=S.active['w_'+type]?.proj||'';
   if(!S.sessions)S.sessions={};
   if(!S.sessions[tk()])S.sessions[tk()]=[];

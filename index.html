@@ -888,7 +888,7 @@ function installPWA(){
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="ent-card">
     <div class="card-hdr card-hdr-btn" onclick="toggleCardCollapse('ent-body','ent-collapse-arrow','ent-hdr-lbl')">
       <span class="card-lbl" id="ent-hdr-lbl">Entertainment</span>
       <div style="display:flex;align-items:center;gap:8px">
@@ -946,7 +946,7 @@ function installPWA(){
     </div><!-- end ent-body -->
   </div>
 
-  <div class="card">
+  <div class="card" id="med-card">
     <div class="card-hdr card-hdr-btn" onclick="toggleCardCollapse('med-body','med-collapse-arrow','med-hdr-lbl')">
       <span class="card-lbl" id="med-hdr-lbl">Meditation</span>
       <span id="med-collapse-arrow" style="color:var(--muted)">▾</span>
@@ -2028,6 +2028,9 @@ function updateWorkUI(){
   document.getElementById('snake-dur-mo').textContent=fmt(moSnDur);
   document.getElementById('snake-avg-mo').textContent=fmt(moSn?Math.round(moSnDur/moSn):0);
   document.getElementById('snake-mo-lbl').textContent=fmt(moSnDur)+' total this mo.';
+  // Snake card frame highlight
+  const snakeCard=document.getElementById('snake-card');
+  if(snakeCard){snakeCard.classList.toggle('card-active-fire',!!sa);}
 
 
   
@@ -2131,7 +2134,7 @@ function updateLifeUI(){
   const anyEntActive=ENT_TYPES.some(t=>S.active['ent_'+t]);
   const entHdrLbl=document.getElementById('ent-hdr-lbl');
   if(entHdrLbl)entHdrLbl.style.color=anyEntActive?'var(--life)':'';
-  const entCard=entHdrLbl&&entHdrLbl.closest('.card');
+  const entCard=document.getElementById('ent-card');
   if(entCard){entCard.classList.toggle('card-active-life',anyEntActive);}
   if(anyEntActive)expandCardIfActive('ent-body','ent-collapse-arrow',true);
   // ent monthly stats
@@ -2170,14 +2173,14 @@ function updateLifeUI(){
   const medActive=!!S.active['fire'];
   const medHdrLbl=document.getElementById('med-hdr-lbl');
   if(medHdrLbl)medHdrLbl.style.color=medActive?'var(--fire-c)':'';
-  const medCard=medHdrLbl&&medHdrLbl.closest('.card');
+  const medCard=document.getElementById('med-card');
   if(medCard){medCard.classList.toggle('card-active-fire',medActive);}
   if(medActive)expandCardIfActive('med-body','med-collapse-arrow',true);
 
   // Re-apply card frame on every UI refresh
-  const entCard2=document.getElementById('ent-hdr-lbl')&&document.getElementById('ent-hdr-lbl').closest('.card');
+  const entCard2=document.getElementById('ent-card');
   if(entCard2)entCard2.classList.toggle('card-active-life',anyEntActive);
-  const medCard2=document.getElementById('med-hdr-lbl')&&document.getElementById('med-hdr-lbl').closest('.card');
+  const medCard2=document.getElementById('med-card');
   if(medCard2)medCard2.classList.toggle('card-active-fire',medActive);
   
   // prep

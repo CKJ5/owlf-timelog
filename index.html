@@ -1578,6 +1578,7 @@ function stopWork(type,startTs){
   const el=elMin(startTs),wst=parseFloat(document.getElementById('w-wst')?.value)||0,net=Math.max(0,el-wst);
   const d=getToday();d[type]=(d[type]||0)+net;d.wasted[type]=(d.wasted[type]||0)+wst;
   const proj=S.active['w_'+type]?.proj||'';
+  if(!S.sessions)S.sessions={};
   if(!S.sessions[tk()])S.sessions[tk()]=[];
   const ptype=S.active['w_'+type]?.ptype||'';
   S.sessions[tk()].push({type,proj,ptype,dur:net,wasted:wst,ts:new Date().toISOString()});

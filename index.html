@@ -1375,6 +1375,7 @@ function updateActiveNotifications(){
   const fa=S.active['fire'];if(fa)active.push({label:'🧘 Meditation',color:'var(--fire-c)',start:fa.start});
   const sa=S.active['snake'];if(sa)active.push({label:'🐍 Snake',color:'var(--snake)',start:sa.start});
   ['game','show','outdoor'].forEach(t=>{const a=S.active['ent_'+t];if(a){const ico=t==='game'?'🎮':t==='show'?'📺':'🌿';active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
+  ['cook','meal','transport','sport','shower','other'].forEach(t=>{const a=S.active['prep_'+t];if(a){const ico={cook:'🍳',meal:'🍱',transport:'🚗',sport:'⚽',shower:'🚿',other:'📦'}[t];active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
   // Update in-app banner
   const banner=document.getElementById('active-banner');
   const itemsEl=document.getElementById('active-banner-items');
@@ -1397,6 +1398,7 @@ setInterval(()=>{
   const fa2=S.active['fire'];if(fa2)acts.push({label:'Meditation',color:'var(--fire-c)',start:fa2.start});
   const sa2=S.active['snake'];if(sa2)acts.push({label:'Heavy',color:'var(--snake)',start:sa2.start});
   ['game','show','outdoor'].forEach(t=>{const a=S.active['ent_'+t];if(a){const ico=t==='game'?'🎮':t==='show'?'📺':'🌿';acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
+  ['cook','meal','transport','sport','shower','other'].forEach(t=>{const a=S.active['prep_'+t];if(a){const ico={cook:'🍳',meal:'🍱',transport:'🚗',sport:'⚽',shower:'🚿',other:'📦'}[t];acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
   const banner=document.getElementById('active-banner');
   const itemsEl=document.getElementById('active-banner-items');
   if(acts.length){
@@ -2027,7 +2029,7 @@ function updateWorkUI(){
   document.getElementById('snake-ct-mo').textContent=moSn;
   document.getElementById('snake-dur-mo').textContent=fmt(moSnDur);
   document.getElementById('snake-avg-mo').textContent=fmt(moSn?Math.round(moSnDur/moSn):0);
-  document.getElementById('snake-mo-lbl').textContent=fmt(moSnDur)+' total this mo.';
+  const _snMoLbl=document.getElementById('snake-mo-lbl');if(_snMoLbl)_snMoLbl.textContent=fmt(moSnDur)+' total this mo.';
   // Snake card frame highlight
   const snakeCard=document.getElementById('snake-card');
   if(snakeCard){snakeCard.classList.toggle('card-active-fire',!!sa);}

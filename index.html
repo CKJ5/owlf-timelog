@@ -14,6 +14,108 @@
 <title>OWLF Time Log</title>
 <link rel="icon" type="image/png" href="./favicon.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyBgMxKBWulYf9bW0WU92mGPEO6lX7mxiGI",authDomain:"owlf-timelog.firebaseapp.com",projectId:"owlf-timelog",storageBucket:"owlf-timelog.firebasestorage.app",messagingSenderId:"562589662039",appId:"1:562589662039:web:4fe24d497dd1c10b339c12"};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+const auth=firebase.auth();
+let _uid=null;
+
+auth.onAuthStateChanged(user=>{
+  if(user){
+    _uid=user.uid;
+    updateFirebaseUI(user);
+    restoreFromFirestore();
+  } else {
+    _uid=null;
+    updateFirebaseUI(null);
+  }
+});
+
+function signInGoogle(){
+  const provider=new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(e=>alert('Sign in failed: '+e.message));
+}
+function signOut(){
+  auth.signOut();
+}
+function updateFirebaseUI(user){
+  const btn=document.getElementById('fb-auth-btn');
+  const lbl=document.getElementById('fb-auth-lbl');
+  if(!btn)return;
+  if(user){
+    btn.textContent='Sign Out';
+    btn.onclick=signOut;
+    if(lbl)lbl.textContent=user.email;
+  } else {
+    btn.textContent='🔑 Sign in with Google';
+    btn.onclick=signInGoogle;
+    if(lbl)lbl.textContent='Not signed in';
+  }
+}
+
+// Delta sync — only today's day + meta
+async function syncToFirestore(){
+  if(!_uid)return;
+  try{
+    const today=tk();
+    const dayData=S.daily[today]||{};
+    const meta={workStreak:S.work.streak||0,sleepStreak:S.life.sleepStreak||0,exStreak:S.exercise.streak||0,workMin:S.workMin||180,sleepTarget:S.sleepTarget||7,exTarget:S.exTarget||100,medalTarget:S.medalTarget||25,projectTypes:S.projectTypes||[],uiStyle:S.uiStyle||'owlf',weekStart:S.weekStart||0,ratioSelections:S.ratioSelections||{},recentSessions:S.recentSessions||[]};
+    const batch=db.batch();
+    batch.set(db.doc(`users/${_uid}/days/${today}`),{...dayData,_ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    // Also sync today's sessions
+    const sess=S.sessions[today]||[];
+    if(sess.length)batch.set(db.doc(`users/${_uid}/sessions/${today}`),{list:sess},{merge:true});
+    batch.set(db.doc(`users/${_uid}/meta/data`),meta,{merge:true});
+    await batch.commit();
+    const lbl=document.getElementById('fb-sync-lbl');
+    if(lbl)lbl.textContent='☁ '+new Date().toLocaleTimeString();
+  }catch(e){console.warn('Firestore sync failed:',e);}
+}
+
+// Restore all days from Firestore on login
+async function restoreFromFirestore(){
+  if(!_uid)return;
+  try{
+    // Restore meta
+    const metaDoc=await db.doc(`users/${_uid}/meta/data`).get();
+    if(metaDoc.exists){
+      const m=metaDoc.data();
+      if(m.workStreak!==undefined)S.work.streak=m.workStreak;
+      if(m.sleepStreak!==undefined)S.life.sleepStreak=m.sleepStreak;
+      if(m.exStreak!==undefined)S.exercise.streak=m.exStreak;
+      if(m.projectTypes)S.projectTypes=m.projectTypes;
+      if(m.uiStyle)S.uiStyle=m.uiStyle;
+      if(m.weekStart!==undefined)S.weekStart=m.weekStart;
+      if(m.ratioSelections)S.ratioSelections=m.ratioSelections;
+      if(m.recentSessions)S.recentSessions=m.recentSessions;
+    }
+    // Restore all days
+    const days=await db.collection(`users/${_uid}/days`).get();
+    days.forEach(doc=>{
+      const k=doc.id;
+      if(!S.daily[k])S.daily[k]=doc.data();
+      else Object.assign(S.daily[k],doc.data());
+      delete S.daily[k]._ts;
+    });
+    // Restore sessions
+    const sess=await db.collection(`users/${_uid}/sessions`).get();
+    sess.forEach(doc=>{
+      const k=doc.id;
+      if(!S.sessions[k]&&doc.data().list)S.sessions[k]=doc.data().list;
+    });
+    save();
+    updateWorkUI();updateLifeUI();updateExUI();renderReport();
+    console.log('Firestore restore done');
+  }catch(e){console.warn('Firestore restore failed:',e);}
+}
+</script>
+  
 <link rel="manifest" id="pwa-manifest-link">
 <script>
 // Inject PWA manifest dynamically (works for single-file offline apps)
@@ -632,6 +734,13 @@ function installPWA(){
         <span>💾 Data</span><span class="set-group-arrow" id="arr-sg-data">▾</span>
       </div>
       <div class="set-group-body" id="sg-data">
+        <div style="margin-bottom:12px">
+            <div class="mlbl" style="margin-bottom:6px">Cloud Sync (Firestore)</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:6px" id="fb-auth-lbl">Not signed in</div>
+            <button id="fb-auth-btn" onclick="signInGoogle()" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #4285f4;background:var(--bg3);color:#4285f4;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:6px">🔑 Sign in with Google</button>
+            <div style="font-size:10px;color:var(--muted)" id="fb-sync-lbl"></div>
+        </div>
+        
         <div style="display:flex;gap:8px;margin-bottom:10px">
           <button onclick="exportData()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">↑ Export</button>
           <button onclick="document.getElementById('imp-file').click()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">↓ Import</button>
@@ -1214,6 +1323,10 @@ function stripForSave(s){
 
   
 function save(){
+  // delta sync after local save (debounced 3s)
+  clearTimeout(save._t);
+  save._t=setTimeout(syncToFirestore,3000);
+  
   const stripped=stripForSave(S);
   const json=JSON.stringify(stripped);
   const compressed=LZString.compress(json);

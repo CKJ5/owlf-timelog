@@ -1446,7 +1446,7 @@ function tick(){
   // Journal prompt at 22:00 MYT
   if(now.getUTCHours()>=22&&!S.journals[tk()]&&!_journalShown){
     _journalShown=true;
-    setTimeout(()=>{try{showJournal();}catch(e){}},2000);
+    if(getNotifPref('journal'))setTimeout(()=>{try{showJournal();}catch(e){}},2000);
   }
   if(now.getUTCHours()<22)_journalShown=false;
 }
@@ -1545,7 +1545,7 @@ setInterval(()=>{
     itemsEl.innerHTML=acts.map(a=>`<span class="active-chip" style="color:${a.color};border-color:${a.color};background:rgba(0,0,0,.18)">${a.label} · ${fmtSec(Math.floor((Date.now()-a.start)/1000))}</span>`).join('');
   } else {banner.style.display='none';itemsEl.innerHTML='';}
   // Post active items to SW for persistent notification
-  if(window._swReg?.active){
+  if(window._swReg?.active&&getNotifPref('active')){
     window._swReg.active.postMessage({type:'NOTIFY_ACTIVE',items:acts.map(a=>a.label)});
   }
 },1000);
@@ -1826,7 +1826,7 @@ function scheduleSleepReminder(wakeTimeStr){
   const msUntil=sleepTarget.getTime()-Date.now();
   if(msUntil>0&&msUntil<86400000){
     setTimeout(()=>{
-      sendNotif('🌙 Time to Sleep','Sleep now to keep your 7h+ streak! Target: '+timeStr(sleepTarget),'owlf-sleep');
+      if(getNotifPref('sleep'))sendNotif('🌙 Time to Sleep','Sleep now to keep your 7h+ streak! Target: '+timeStr(sleepTarget),'owlf-sleep');
     },msUntil);
   }
 }
@@ -2388,11 +2388,11 @@ setInterval(()=>{
   if(!_entWarn10Sent||_entWarn10Sent!==dayKey){_entWarn10Sent=false;}
   if(entTotal>=110&&entTotal<120&&!_entWarn10Sent){
     _entWarn10Sent=dayKey;
-    sendNotif('⚠️ Entertainment Limit','Only 10 minutes of entertainment remaining today! Finish up 🎮','owlf-ent-warn');
+    if(getNotifPref('ent'))sendNotif('⚠️ Entertainment Limit','Only 10 minutes of entertainment remaining today! Finish up 🎮','owlf-ent-warn');
   }
   if(entTotal>=120&&_entWarn10Sent!=='over-'+dayKey){
     _entWarn10Sent='over-'+dayKey;
-    sendNotif('🚨 Entertainment Over Limit','You\'ve exceeded your 2h entertainment limit today.','owlf-ent-over');
+    if(getNotifPref('ent'))sendNotif('🚨 Entertainment Over Limit','You\'ve exceeded your 2h entertainment limit today.','owlf-ent-over');
   }
 },1000);
 

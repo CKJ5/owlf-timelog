@@ -1,4 +1,4 @@
-
+  
 
 <!DOCTYPE html>
 <html lang="en">
@@ -682,6 +682,8 @@ function installPWA(){
       </div>
     </div>
 
+
+    
     <!-- GROUP: Calendar & Reports -->
     <div class="set-group">
       <div class="set-group-hdr" onclick="toggleSetGroup('sg-calendar')">
@@ -724,7 +726,13 @@ function installPWA(){
       </div>
       <div class="set-group-body" id="sg-notif">
         <button id="notif-perm-btn" onclick="requestNotifFromBtn()" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid var(--work);background:var(--bg3);color:var(--work);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;text-align:left">🔔 Enable Notifications</button>
-        <div style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">Tap above, then Allow in the browser prompt. On Chrome Android: bookmark this page and open from homescreen for best notification support.</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">Tap above, then Allow in the browser prompt.</div>
+<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">
+  <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--text)">Active session banner <input type="checkbox" id="notif-active" checked onchange="saveNotifPref('active',this.checked)" style="width:18px;height:18px;accent-color:var(--work)"></label>
+  <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--text)">Entertainment warning <input type="checkbox" id="notif-ent" checked onchange="saveNotifPref('ent',this.checked)" style="width:18px;height:18px;accent-color:var(--work)"></label>
+  <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--text)">Sleep reminder <input type="checkbox" id="notif-sleep" checked onchange="saveNotifPref('sleep',this.checked)" style="width:18px;height:18px;accent-color:var(--work)"></label>
+  <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--text)">Journal prompt (10pm) <input type="checkbox" id="notif-journal" checked onchange="saveNotifPref('journal',this.checked)" style="width:18px;height:18px;accent-color:var(--work)"></label>
+</div>
       </div>
     </div>
 
@@ -1413,6 +1421,8 @@ function showSettings(){
   renderStylePicker();
   updateGdriveUI(); // add this line
   document.getElementById('settings-overlay').classList.remove('hidden');
+
+  loadNotifPrefs();
 }
 function updateSettingsUI(){renderStylePicker();}
 function toggleSetGroup(id){
@@ -1471,6 +1481,22 @@ function updateNotifBtnUI(){
   else if(Notification.permission==='denied'){btn.textContent='🔕 Notifications Blocked (enable in browser settings)';btn.style.color='var(--muted)';}
   else{btn.textContent='🔔 Enable Notifications';btn.style.borderColor='var(--work)';btn.style.color='var(--work)';}
 }
+
+function saveNotifPref(key,val){
+  if(!S.notifPrefs)S.notifPrefs={};
+  S.notifPrefs[key]=val;save();
+}
+function getNotifPref(key){
+  return !S.notifPrefs||S.notifPrefs[key]!==false;
+}
+function loadNotifPrefs(){
+  ['active','ent','sleep','journal'].forEach(k=>{
+    const el=document.getElementById('notif-'+k);
+    if(el)el.checked=getNotifPref(k);
+  });
+}
+
+  
 function requestNotifFromBtn(){
   requestNotifPerm().then(perm=>{
     updateNotifBtnUI();
@@ -1518,6 +1544,10 @@ setInterval(()=>{
     banner.style.display='block';
     itemsEl.innerHTML=acts.map(a=>`<span class="active-chip" style="color:${a.color};border-color:${a.color};background:rgba(0,0,0,.18)">${a.label} · ${fmtSec(Math.floor((Date.now()-a.start)/1000))}</span>`).join('');
   } else {banner.style.display='none';itemsEl.innerHTML='';}
+  // Post active items to SW for persistent notification
+  if(window._swReg?.active){
+    window._swReg.active.postMessage({type:'NOTIFY_ACTIVE',items:acts.map(a=>a.label)});
+  }
 },1000);
 
 // ═══ SWIPE ═══
@@ -1695,7 +1725,9 @@ function stopWork(type,startTs){
   if(!S.sessions[tk()])S.sessions[tk()]=[];
   const ptype=S.active['w_'+type]?.ptype||'';
   S.sessions[tk()].push({type,proj,ptype,dur:net,wasted:wst,ts:new Date().toISOString()});
-  delete S.active['w_'+type];save();closeModal();calcWorkStreak();updateWorkUI();
+  delete S.active['w_'+type];
+if(window._swReg?.active)window._swReg.active.postMessage({type:'CLEAR',tag:'owlf-work'});
+save();closeModal();calcWorkStreak();updateWorkUI();
 }
 function calcWorkStreak(){
   let s=0;let cur=new Date();

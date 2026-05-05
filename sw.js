@@ -58,7 +58,7 @@ self.addEventListener('message', e => {
       body: items.join(' · '),
       tag: 'owlf-active',
       icon: './icon-192.png',
-      badge: './icon-192.png',
+      badge: './badge-72.png',
       renotify: false,
       requireInteraction: false,
       silent: true

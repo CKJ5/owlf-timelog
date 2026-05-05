@@ -1715,7 +1715,7 @@ function startWork(type){
   // Auto-add new type to projectTypes
   if(ptype&&!(S.projectTypes||[]).includes(ptype)){if(!S.projectTypes)S.projectTypes=[];S.projectTypes.push(ptype);}
   addRecentSession(ptype,proj);
-  S.active['w_'+type]={start:nowTs(),proj,ptype};save();closeModal();updateWorkUI();sendNotif('OWLF Work','Started '+type+(proj?' — '+proj:''),'owlf-work');
+  S.active['w_'+type]={start:nowTs(),proj,ptype};save();closeModal();updateWorkUI();
 }
 function stopWork(type,startTs){
   const el=elMin(startTs),wst=parseFloat(document.getElementById('w-wst')?.value)||0,net=Math.max(0,el-wst);

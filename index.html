@@ -1251,7 +1251,7 @@ const elMin=t=>(nowTs()-t)/60000;
 const elSec=t=>Math.floor((nowTs()-t)/1000);
 function fmtSec(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;return h>0?h+':'+pad(m)+':'+pad(ss):m+':'+pad(ss);}
 function fmt(min){const h=Math.floor(min/60),m=Math.round(min%60);return h===0?m+'m':h+'h'+(m>0?' '+m+'m':'');}
-function fmtH(h){return h.toFixed(1)+'h';}
+function fmtH(h){const hr=Math.floor(h),mn=Math.round((h-hr)*60);return hr+'h'+(mn>0?' '+mn+'m':'');}
 function fmtDate(k){const[y,mo,d]=k.split('-');const N=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return N[parseInt(mo)-1]+' '+parseInt(d)+', '+y;}
 function fmtMo(k){const[y,mo]=k.split('-');const N=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return N[parseInt(mo)-1]+' '+y;}
 function timeStr(d){return pad(d.getUTCHours())+':'+pad(d.getUTCMinutes());}

@@ -1126,6 +1126,34 @@ function installPWA(){
       <div class="ex-btn" onclick="addEx('jian')"><div class="ex-name">肩</div><div class="ex-count" id="exc-jian">0</div><div class="ex-sub" id="exs-jian">—</div></div>
       <div class="ex-btn" onclick="addEx('bei')"><div class="ex-name">背</div><div class="ex-count" id="exc-bei">0</div><div class="ex-sub" id="exs-bei">—</div></div>
     </div>
+
+    <div class="card">
+  <div class="card-hdr"><span class="card-lbl" style="color:var(--ex)">Cardio</span><span class="tdisplay" id="cardio-today-dur">0m today</span></div>
+  <div class="ent-row">
+    <button class="ent-btn" id="cbt-jogging" onclick="toggleCardio('jogging')">
+      <div>🏃 Jog</div>
+      <div class="ent-timer" id="ctimer-jogging" style="display:none">—</div>
+      <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace" id="cdur-jogging">0m</div>
+    </button>
+    <button class="ent-btn" id="cbt-cycling" onclick="toggleCardio('cycling')">
+      <div>🚴 Cycle</div>
+      <div class="ent-timer" id="ctimer-cycling" style="display:none">—</div>
+      <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace" id="cdur-cycling">0m</div>
+    </button>
+    <button class="ent-btn" id="cbt-hiit" onclick="toggleCardio('hiit')">
+      <div>🔥 HIIT</div>
+      <div class="ent-timer" id="ctimer-hiit" style="display:none">—</div>
+      <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace" id="cdur-hiit">0m</div>
+    </button>
+  </div>
+  <div class="sr3">
+    <div class="sbox"><div class="snum" style="color:var(--ex)" id="cardio-dur-today">0m</div><div class="slbl">Today</div></div>
+    <div class="sbox"><div class="snum" style="color:var(--ex)" id="cardio-dur-mo">0m</div><div class="slbl">Mo. Total</div></div>
+    <div class="sbox"><div class="snum" style="color:var(--ex)" id="cardio-avg-mo">0m</div><div class="slbl">Mo. Avg</div></div>
+  </div>
+</div>
+
+    
   </div>
 </div>
 
@@ -1963,6 +1991,23 @@ function checkExTarget(){
   }
 }
 
+const CARDIO_TYPES=['jogging','cycling','hiit'];
+function cardioDayTotal(d){return CARDIO_TYPES.reduce((s,t)=>s+(d['cardio_'+t]||0),0);}
+function toggleCardio(type){
+  const a=S.active['cardio_'+type];
+  if(a){
+    const el=Math.round(elMin(a.start));
+    const d=getToday();
+    d['cardio_'+type]=(d['cardio_'+type]||0)+el;
+    if(!d['cardio_'+type+'Log'])d['cardio_'+type+'Log']=[];
+    if(el>0)d['cardio_'+type+'Log'].push({dur:el,ts:a.start});
+    delete S.active['cardio_'+type];save();updateExUI();
+  } else {
+    S.active['cardio_'+type]={start:nowTs()};save();updateExUI();
+  }
+}
+
+  
 // ═══ JOURNAL ═══
 function showJournal(){const ex=S.journals[tk()]||'';document.getElementById('journal-txt').value=ex;document.getElementById('journal-overlay').classList.remove('hidden');}
 function closeJournal(){document.getElementById('journal-overlay').classList.add('hidden');}
@@ -2363,6 +2408,24 @@ function updateExUI(){
     document.getElementById('exc-'+t).textContent=d[t]||0;
     document.getElementById('exs-'+t).textContent=(d[t+'Sets']||[]).length?(d[t+'Sets']).join('+'):'—';
   });
+
+  const d2=getToday();const mo2=mk();
+  const moKeys2=Object.keys(S.daily).filter(k=>k.startsWith(mo2));
+  CARDIO_TYPES.forEach(t=>{
+    const a=S.active['cardio_'+t];
+    const btn=document.getElementById('cbt-'+t);if(btn)btn.className='ent-btn'+(a?' act-life':'');
+    const timerEl=document.getElementById('ctimer-'+t);
+    if(timerEl){timerEl.style.display=a?'block':'none';}
+    const durEl=document.getElementById('cdur-'+t);
+    if(durEl)durEl.textContent=fmt(d2['cardio_'+t]||0);
+  });
+  const cardioTotal=cardioDayTotal(d2);
+  const cardioHdr=document.getElementById('cardio-today-dur');if(cardioHdr)cardioHdr.textContent=fmt(cardioTotal)+' today';
+  const cardioDurEl=document.getElementById('cardio-dur-today');if(cardioDurEl)cardioDurEl.textContent=fmt(cardioTotal);
+  const moCardio=moKeys2.reduce((s,k)=>s+cardioDayTotal(S.daily[k]||{}),0);
+  const cardioDurMo=document.getElementById('cardio-dur-mo');if(cardioDurMo)cardioDurMo.textContent=fmt(moCardio);
+  const cardioAvg=document.getElementById('cardio-avg-mo');if(cardioAvg)cardioAvg.textContent=fmt(moKeys2.length?Math.round(moCardio/moKeys2.length):0);
+  
   updateTopStreak();
 }
 
@@ -2377,6 +2440,18 @@ setInterval(()=>{
     const timerEl=document.getElementById('etimer-'+t);
     if(timerEl){timerEl.style.display=a?'block':'none';if(a)timerEl.textContent=fmtSec(elSec(a.start));}
   });
+  CARDIO_TYPES.forEach(t=>{
+    const a=S.active['cardio_'+t];
+    const timerEl=document.getElementById('ctimer-'+t);
+    if(timerEl){timerEl.style.display=a?'block':'none';if(a)timerEl.textContent=fmtSec(elSec(a.start));}
+  });
+
+  CARDIO_TYPES.forEach(t=>{
+    const a=S.active['cardio_'+t];
+    const timerEl=document.getElementById('ctimer-'+t);
+    if(timerEl){timerEl.style.display=a?'block':'none';if(a)timerEl.textContent=fmtSec(elSec(a.start));}
+  });
+  
   PREP_TYPES.forEach(t=>{
     const a=S.active['prep_'+t];
     const timerEl=document.getElementById('ptimer-'+t);

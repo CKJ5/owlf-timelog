@@ -1474,12 +1474,12 @@ function tick(){
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   document.getElementById('top-date').textContent=days[now.getUTCDay()]+', '+months[now.getUTCMonth()]+' '+now.getUTCDate()+' '+now.getUTCFullYear();
   document.getElementById('top-time').textContent=pad(now.getUTCHours())+':'+pad(now.getUTCMinutes())+':'+pad(now.getUTCSeconds());
-  // Journal prompt at 22:00 MYT
-  if(now.getUTCHours()>=22&&!S.journals[tk()]&&!_journalShown){
-    _journalShown=true;
-    if(getNotifPref('journal'))setTimeout(()=>{try{showJournal();}catch(e){}},2000);
-  }
-  if(now.getUTCHours()<22)_journalShown=false;
+  // Journal prompt at 22:00 MYT 
+ // if(now.getUTCHours()>=22&&!S.journals[tk()]&&!_journalShown){
+  //  _journalShown=true;
+  //  if(getNotifPref('journal'))setTimeout(()=>{try{showJournal();}catch(e){}},2000);
+//  }
+ // if(now.getUTCHours()<22)_journalShown=false;
 }
 setInterval(tick,1000);tick();
 

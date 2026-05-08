@@ -644,6 +644,8 @@ function installPWA(){
       </div>
     </div>
 
+    
+
     <!-- GROUP: Targets -->
     <div class="set-group">
       <div class="set-group-hdr" onclick="toggleSetGroup('sg-targets')">
@@ -688,6 +690,25 @@ function installPWA(){
 
     
     <!-- GROUP: Calendar & Reports -->
+    <div class="set-group">
+  <div class="set-group-hdr" onclick="toggleSetGroup('sg-timezone')">
+    <span>🌍 Timezone</span><span class="set-group-arrow" id="arr-sg-timezone">▾</span>
+  </div>
+  <div class="set-group-body" id="sg-timezone">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">All times stored and displayed in your local timezone.</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button onclick="autoDetectTZ()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--work);background:var(--bg3);color:var(--work);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;cursor:pointer">⚡ Auto Detect</button>
+    </div>
+    <div class="mlbl" style="margin-bottom:5px">UTC Offset (hours)</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="number" id="tz-offset-inp" min="-12" max="14" step="0.5" value="8" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:15px">
+      <button onclick="saveTZOffset()" style="padding:10px 16px;border-radius:8px;border:none;background:var(--work);color:#1a1000;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Save</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:5px" id="tz-current-lbl">Current: UTC+8 (Malaysia)</div>
+  </div>
+</div>
+
+    
     <div class="set-group">
       <div class="set-group-hdr" onclick="toggleSetGroup('sg-calendar')">
         <span>📅 Calendar & Reports</span><span class="set-group-arrow" id="arr-sg-calendar">▾</span>
@@ -1279,7 +1300,27 @@ const START='2026-01-01';
 let S={};
 const pad=n=>String(n).padStart(2,'0');
 // Malaysia time = UTC+8
-function myDate(){const d=new Date();const myt=new Date(d.getTime()+8*3600*1000);return myt;}
+function getTZOffset(){return S.tzOffset!==undefined?S.tzOffset:8;}
+function myDate(){const d=new Date();return new Date(d.getTime()+getTZOffset()*3600*1000);}
+function autoDetectTZ(){
+  const offset=-new Date().getTimezoneOffset()/60;
+  S.tzOffset=offset;save();
+  loadTZSetting();
+  alert('Detected: UTC'+(offset>=0?'+':'')+offset);
+}
+function saveTZOffset(){
+  const v=parseFloat(document.getElementById('tz-offset-inp').value);
+  if(isNaN(v))return;
+  S.tzOffset=v;save();loadTZSetting();
+}
+function loadTZSetting(){
+  const offset=getTZOffset();
+  const inp=document.getElementById('tz-offset-inp');
+  if(inp)inp.value=offset;
+  const lbl=document.getElementById('tz-current-lbl');
+  if(lbl)lbl.textContent='Current: UTC'+(offset>=0?'+':'')+offset;
+}
+  
 const tk=()=>myDate().toISOString().slice(0,10);
 const mk=()=>myDate().toISOString().slice(0,7);
 const yk=()=>myDate().toISOString().slice(0,4);
@@ -1460,6 +1501,7 @@ function showSettings(){
   document.getElementById('settings-overlay').classList.remove('hidden');
 
   loadNotifPrefs();
+  loadTZSetting();
 }
 function updateSettingsUI(){renderStylePicker();}
 function toggleSetGroup(id){
@@ -1685,6 +1727,7 @@ const WTYPES=['design','games','clients'];
 // Track recent type+project combos
 function addRecentSession(ptype,proj){
   if(!S.recentSessions)S.recentSessions=[];
+  if(S.tzOffset===undefined)S.tzOffset=8;
   const key=ptype+'||'+proj;
   S.recentSessions=S.recentSessions.filter(r=>r!==key);
   if(ptype||proj)S.recentSessions.unshift(key);
@@ -3163,6 +3206,55 @@ function buildTimeline(dateKey){
   const sleepMin=d.sleepTime?parseHM(d.sleepTime).h*60+parseHM(d.sleepTime).m:null;
   const sess=S.sessions[dateKey]||[];
 
+function rebuildGridRows(uid,dateKey,startMin,totalMin,isFull){
+  const d=S.daily[dateKey];if(!d)return'';
+  const wakeMin=d.wakeTime?(parseHM(d.wakeTime).h*60+parseHM(d.wakeTime).m):420;
+  const sess=S.sessions[dateKey]||[];
+  const events=[];
+  sess.forEach(s=>{
+    if(!s.ts)return;
+    const endMin=new Date(s.ts).getUTCHours()*60+new Date(s.ts).getUTCMinutes();
+    const startMin2=endMin-Math.round(s.dur);
+    const typeColor={design:'#dfb67e',games:'#dfb67e',clients:'#dfb67e'};
+    const ico={design:'✏',games:'🕹',clients:'👔'}[s.type]||'💼';
+    events.push({label:ico+' '+(s.proj||s.type),color:typeColor[s.type]||'#dfb67e',start:startMin2,end:endMin,cat:'work'});
+  });
+  PREP_TYPES.forEach(t=>{
+    const log=d['prep'+t[0].toUpperCase()+t.slice(1)+'Log']||[];
+    log.forEach(dur=>events.push({label:PREP_ICONS[t]+' '+t,color:'#13b5a6',start:wakeMin,end:wakeMin+dur,cat:'prep'}));
+  });
+  ENT_TYPES.forEach(t=>{
+    const log=d['ent'+t[0].toUpperCase()+t.slice(1)+'Log']||[];
+    const names=d['ent'+t[0].toUpperCase()+t.slice(1)+'Names']||[];
+    const ico={game:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'}[t];
+    log.forEach((dur,i)=>events.push({label:ico+' '+(names[i]||t),color:'#ee4996',start:wakeMin,end:wakeMin+dur,cat:'ent'}));
+  });
+  if(d.snakeDur)events.push({label:'🐍 Heavy',color:'#9b59b6',start:wakeMin,end:wakeMin+d.snakeDur,cat:'snake'});
+  if(d.fireDur)events.push({label:'🧘 Meditate',color:'#ff6b35',start:wakeMin,end:wakeMin+d.fireDur,cat:'med'});
+
+  function b(ev){
+    const l=((ev.start-startMin)/totalMin*100).toFixed(2);
+    const w=Math.max(0.5,((ev.end-ev.start)/totalMin*100)).toFixed(2);
+    return`<div style="position:absolute;left:${l}%;width:${w}%;height:100%;background:${ev.color};border-radius:2px" title="${ev.label}"></div>`;
+  }
+  const cats={work:{color:'#dfb67e',label:'Work'},prep:{color:'#13b5a6',label:'Prep'},ent:{color:'#ee4996',label:'Ent'},snake:{color:'#9b59b6',label:'Heavy'},med:{color:'#ff6b35',label:'Meditate'}};
+  function catRow(key){
+    const evs=events.filter(e=>e.cat===key);if(!evs.length)return'';
+    const c=cats[key];
+    return`<div style="position:relative;height:12px;margin:0 0 3px 0"><div style="position:absolute;left:0;width:100%;height:100%;border-radius:2px;background:repeating-linear-gradient(90deg,rgba(150,150,150,0.06) 0px,rgba(150,150,150,0.06) 4px,transparent 4px,transparent 8px)"></div>${evs.map(b).join('')}<div style="position:absolute;right:2px;top:1px;font-size:8px;color:${c.color}">${c.label}</div></div>`;
+  }
+  const sleepMin=d.sleepTime?(parseHM(d.sleepTime).h*60+parseHM(d.sleepTime).m):1380;
+  const sleepRow=isFull?`<div style="position:relative;height:12px;margin:0 0 3px 0">
+    <div style="position:absolute;left:${((sleepMin)/1440*100).toFixed(2)}%;width:${(((1440-sleepMin))/1440*100).toFixed(2)}%;height:100%;background:#7ec8e3;border-radius:2px;opacity:0.4"></div>
+    <div style="position:absolute;left:0%;width:${((wakeMin)/1440*100).toFixed(2)}%;height:100%;background:#7ec8e3;border-radius:2px;opacity:0.4"></div>
+    <div style="position:absolute;right:2px;top:1px;font-size:8px;color:#7ec8e3">Sleep</div></div>`:'';
+  const hrs=isFull?[0,4,8,12,16,20,23]:[Math.floor(startMin/60),Math.floor(startMin/60)+3,Math.floor(startMin/60)+6];
+  const tlHtml=hrs.map(h=>{const pct=((h*60-startMin)/totalMin*100);if(pct<0||pct>98)return'';return`<div style="position:absolute;left:${pct.toFixed(1)}%;font-size:9px;color:var(--muted);transform:translateX(-50%)">${pad(h)}:00</div>`;}).join('');
+  return catRow('work')+catRow('prep')+catRow('ent')+catRow('snake')+catRow('med')+sleepRow+`<div style="position:relative;height:14px">${tlHtml}</div>`;
+}
+
+
+  
   // Build events list from sessions + logs
   const events=[];
   if(wakeMin!==null)events.push({label:'☀️ Wake',color:'#7ec8e3',start:wakeMin,end:wakeMin,point:true});
@@ -3231,7 +3323,7 @@ function buildTimeline(dateKey){
         </div>
       </label>
     </div>
-    <div style="position:relative;background:var(--bg2);border-radius:6px;border:1px solid var(--border);padding:5px 0 16px 0" id="tl-grid-${uid}">
+    <div style="position:relative;background:var(--bg2);border-radius:6px;border:1px solid var(--border);padding:5px 0 16px 0" id="tl-grid-${uid}" data-datekey="${dateKey}">
       ${catRow('work',awakeStart,awakeTotalMin)}
       ${catRow('prep',awakeStart,awakeTotalMin)}
       ${catRow('ent',awakeStart,awakeTotalMin)}
@@ -3260,15 +3352,28 @@ function tlDetails(uid){
   det.style.maxHeight=open?'0px':det.scrollHeight+'px';
   arr.textContent=open?'▾':'▴';
 }
+const _tlState={};
 function tlToggle(uid){
-  // Toggle stored per uid — simple approach
+  _tlState[uid]=!_tlState[uid];
+  const isFull=_tlState[uid];
   const lbl=document.getElementById('tl-lbl-'+uid);
   const tog=document.getElementById('tl-tog-'+uid);
   const knob=document.getElementById('tl-knob-'+uid);
-  const isFull=lbl.textContent==='Full 24h';
-  lbl.textContent=isFull?'Awake only':'Full 24h';
-  tog.style.background=isFull?'var(--border)':'#7ec8e3';
-  knob.style.left=isFull?'2px':'14px';
+  if(lbl)lbl.textContent=isFull?'Full 24h':'Awake only';
+  if(tog)tog.style.background=isFull?'#7ec8e3':'var(--border)';
+  if(knob)knob.style.left=isFull?'14px':'2px';
+  // Re-render grid
+  const grid=document.getElementById('tl-grid-'+uid);
+  if(!grid)return;
+  const dateKey=grid.dataset.datekey;
+  if(!dateKey)return;
+  const d=S.daily[dateKey];
+  if(!d)return;
+  const wakeMin=d.wakeTime?(parseHM(d.wakeTime).h*60+parseHM(d.wakeTime).m):420;
+  const sleepMin=d.sleepTime?(parseHM(d.sleepTime).h*60+parseHM(d.sleepTime).m):1380;
+  const startMin=isFull?0:wakeMin;
+  const totalMin=isFull?1440:(sleepMin>wakeMin?sleepMin-wakeMin:sleepMin+1440-wakeMin);
+  grid.innerHTML=rebuildGridRows(uid,dateKey,startMin,totalMin,isFull);
 }
 
 

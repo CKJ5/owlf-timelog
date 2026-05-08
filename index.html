@@ -1301,6 +1301,12 @@ let S={};
 const pad=n=>String(n).padStart(2,'0');
 // Malaysia time = UTC+8
 function getTZOffset(){return S.tzOffset!==undefined?S.tzOffset:8;}
+
+  function tsToMytMin(ts){
+  const d=new Date(new Date(ts).getTime()+getTZOffset()*3600*1000);
+  return d.getUTCHours()*60+d.getUTCMinutes();
+  }
+  
 function myDate(){const d=new Date();return new Date(d.getTime()+getTZOffset()*3600*1000);}
 function autoDetectTZ(){
   const offset=-new Date().getTimezoneOffset()/60;
@@ -1823,7 +1829,10 @@ function calcWorkStreak(){
 // ═══ SNAKE ═══
 function toggleSnake(){
   const a=S.active['snake'];
-  if(a){const el=Math.round(elMin(a.start));const d=getToday();d.snakeDur=(d.snakeDur||0)+el;d.snakeSessions=(d.snakeSessions||0)+1;delete S.active['snake'];save();updateWorkUI();}
+  if(a){const el=Math.round(elMin(a.start));const d=getToday();
+        d.snakeDur=(d.snakeDur||0)+el;d.snakeSessions=(d.snakeSessions||0)+1;
+if(!d.snakeLog)d.snakeLog=[];d.snakeLog.push({dur:el,end:nowTs()});
+        delete S.active['snake'];save();updateWorkUI();}
   else{S.active['snake']={start:nowTs()};save();updateWorkUI();}
 }
 
@@ -1939,7 +1948,7 @@ function toggleEnt(type){
     d['ent'+cap]=(d['ent'+cap]||0)+el;
     d['ent'+cap+'Sessions']=(d['ent'+cap+'Sessions']||0)+1;
     if(!d['ent'+cap+'Log'])d['ent'+cap+'Log']=[];
-    if(el>0)d['ent'+cap+'Log'].push(el);
+    if(el>0)d['ent'+cap+'Log'].push({dur:el,end:nowTs()});
     delete S.active['ent_'+type];save();updateLifeUI();
   } else {
     const icons={game:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'};
@@ -1957,7 +1966,11 @@ function startEnt(type){
 // ═══ FIRE ═══
 function triggerFire(){
   const a=S.active['fire'];
-  if(a){const el=Math.round(elMin(a.start));const d=getToday();d.fireDur=(d.fireDur||0)+el;d.fireCount=(d.fireCount||0)+1;delete S.active['fire'];save();updateLifeUI();return;}
+  if(a){const el=Math.round(elMin(a.start));const d=getToday();d.fireDur=(d.fireDur||0)+el;
+        d.fireCount=(d.fireCount||0)+1;
+if(!d.fireLog)d.fireLog=[];d.fireLog.push({dur:el,end:nowTs()});
+delete S.active['fire'];
+        save();updateLifeUI();return;}
   showModal(`<div style="text-align:center;font-size:38px;margin-bottom:8px">🧘</div><h3 style="color:var(--fire-c);text-align:center">Warning!</h3><p style="color:var(--muted);font-size:14px;margin:0 0 18px;text-align:center;line-height:1.6">Starting a meditation session breaks your clean streak. Are you sure?</p><div class="mbtns"><button class="bcanc" onclick="praiseFire()">No — Stay Strong</button><button class="bconf bwarn" onclick="startFire()">Yes 🧘</button></div>`,null);
 }
 function praiseFire(){closeModal();showModal(`<div style="text-align:center;font-size:38px;margin-bottom:8px">💪</div><h3 style="color:#13b5a6;text-align:center">Legend!</h3><p style="color:var(--muted);font-size:14px;text-align:center;line-height:1.6;margin-bottom:16px">Clean streak continues!</p><div class="mbtns"><button class="bconf bex" onclick="closeModal()">Hell yeah!</button></div>`,null);}
@@ -2010,7 +2023,7 @@ function togglePrep(type){
     const key='prep'+cap;
     d[key]=(d[key]||0)+el;
     if(!d[key+'Log'])d[key+'Log']=[];
-    if(el>0)d[key+'Log'].push(el);
+    if(el>0)d[key+'Log'].push({dur:el,end:nowTs()});
     delete S.active['prep_'+type];save();updateLifeUI();
   } else {
     S.active['prep_'+type]={start:nowTs()};save();updateLifeUI();
@@ -2049,7 +2062,7 @@ function toggleCardio(type){
     const d=getToday();
     d['cardio_'+type]=(d['cardio_'+type]||0)+el;
     if(!d['cardio_'+type+'Log'])d['cardio_'+type+'Log']=[];
-    if(el>0)d['cardio_'+type+'Log'].push({dur:el,ts:a.start});
+    if(el>0)d['cardio_'+type+'Log'].push({dur:el,end:nowTs()});
     delete S.active['cardio_'+type];save();updateExUI();
   } else {
     S.active['cardio_'+type]={start:nowTs()};save();updateExUI();
@@ -3211,26 +3224,38 @@ function rebuildGridRows(uid,dateKey,startMin,totalMin,isFull){
   const wakeMin=d.wakeTime?(parseHM(d.wakeTime).h*60+parseHM(d.wakeTime).m):420;
   const sess=S.sessions[dateKey]||[];
   const events=[];
-  sess.forEach(s=>{
-    if(!s.ts)return;
-    const endMin=new Date(s.ts).getUTCHours()*60+new Date(s.ts).getUTCMinutes();
-    const startMin2=endMin-Math.round(s.dur);
-    const typeColor={design:'#dfb67e',games:'#dfb67e',clients:'#dfb67e'};
-    const ico={design:'✏',games:'🕹',clients:'👔'}[s.type]||'💼';
-    events.push({label:ico+' '+(s.proj||s.type),color:typeColor[s.type]||'#dfb67e',start:startMin2,end:endMin,cat:'work'});
-  });
   PREP_TYPES.forEach(t=>{
-    const log=d['prep'+t[0].toUpperCase()+t.slice(1)+'Log']||[];
-    log.forEach(dur=>events.push({label:PREP_ICONS[t]+' '+t,color:'#13b5a6',start:wakeMin,end:wakeMin+dur,cat:'prep'}));
+  const log=d['prep'+t[0].toUpperCase()+t.slice(1)+'Log']||[];
+  log.forEach(entry=>{
+    const dur=typeof entry==='object'?entry.dur:entry;
+    const endMs=typeof entry==='object'?entry.end:null;
+    const endM=endMs?((new Date(new Date(endMs).getTime()+getTZOffset()*3600*1000)).getUTCHours()*60+(new Date(new Date(endMs).getTime()+getTZOffset()*3600*1000)).getUTCMinutes()):wakeMin+dur;
+    events.push({label:PREP_ICONS[t]+' '+t,color:'#13b5a6',start:endM-dur,end:endM,cat:'prep'});
   });
-  ENT_TYPES.forEach(t=>{
-    const log=d['ent'+t[0].toUpperCase()+t.slice(1)+'Log']||[];
-    const names=d['ent'+t[0].toUpperCase()+t.slice(1)+'Names']||[];
-    const ico={game:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'}[t];
-    log.forEach((dur,i)=>events.push({label:ico+' '+(names[i]||t),color:'#ee4996',start:wakeMin,end:wakeMin+dur,cat:'ent'}));
+});
+ENT_TYPES.forEach(t=>{
+  const log=d['ent'+t[0].toUpperCase()+t.slice(1)+'Log']||[];
+  const names=d['ent'+t[0].toUpperCase()+t.slice(1)+'Names']||[];
+  const ico={game:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'}[t];
+  log.forEach((entry,i)=>{
+    const dur=typeof entry==='object'?entry.dur:entry;
+    const endMs=typeof entry==='object'?entry.end:null;
+    const endM=endMs?((new Date(new Date(endMs).getTime()+getTZOffset()*3600*1000)).getUTCHours()*60+(new Date(new Date(endMs).getTime()+getTZOffset()*3600*1000)).getUTCMinutes()):wakeMin+dur;
+    events.push({label:ico+' '+(names[i]||t),color:'#ee4996',start:endM-dur,end:endM,cat:'ent'});
   });
-  if(d.snakeDur)events.push({label:'🐍 Heavy',color:'#9b59b6',start:wakeMin,end:wakeMin+d.snakeDur,cat:'snake'});
-  if(d.fireDur)events.push({label:'🧘 Meditate',color:'#ff6b35',start:wakeMin,end:wakeMin+d.fireDur,cat:'med'});
+});
+(d.snakeLog||[]).forEach(entry=>{
+  const dur=typeof entry==='object'?entry.dur:entry;
+  const endMs=typeof entry==='object'?entry.end:null;
+  const endM=endMs?((new Date(new Date(endMs).getTime()+getTZOffset()*3600*1000)).getUTCHours()*60+(new Date(new Date(endMs).getTime()+getTZOffset()*3600*1000)).getUTCMinutes()):wakeMin+dur;
+  events.push({label:'🐍 Heavy',color:'#9b59b6',start:endM-dur,end:endM,cat:'snake'});
+});
+(d.fireLog||[]).forEach(entry=>{
+  const dur=typeof entry==='object'?entry.dur:entry;
+  const endMs=typeof entry==='object'?entry.end:null;
+  const endM=endMs?((new Date(new Date(endMs).getTime()+getTZOffset()*3600*1000)).getUTCHours()*60+(new Date(new Date(endMs).getTime()+getTZOffset()*3600*1000)).getUTCMinutes()):wakeMin+dur;
+  events.push({label:'🧘 Meditate',color:'#ff6b35',start:endM-dur,end:endM,cat:'med'});
+});
 
   function b(ev){
     const l=((ev.start-startMin)/totalMin*100).toFixed(2);

@@ -3174,7 +3174,7 @@ function buildDailyCompact(dateKey){
     return h;
   }
   // Helper: format session log array as "30m+1h+30m"
-  const fmtLog=log=>(log&&log.length)?log.map(fmt).join('+'):'—';
+  const fmtLog=log=>(log&&log.length)?log.map(e=>fmt(typeof e==='object'?e.dur:e)).join('+'):'—';
   return [
     overSec,
     buildWorkTree(typeTree),

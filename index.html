@@ -3146,6 +3146,8 @@ function buildDailyCompact(dateKey){
       ['Total',d.exTotal||0,'var(--ex)'],
       ...EX_KEYS.map(t=>[EX_LABELS[t], String(d[t]||0)+((d[t+'Sets']&&d[t+'Sets'].length)?' ('+d[t+'Sets'].join('+')+')'  : '')])
     ]),
+
+    buildTimeline(dateKey),
     
     journal?`<div class="compact-section"><div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;border-bottom:1px solid var(--border);padding-bottom:5px">📓 Journal</div><textarea rows="4" style="width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:13px;resize:none;line-height:1.6" oninput="saveInlineJournal('${dateKey}',this.value)">${journal}</textarea></div>`
     :`<div class="compact-section"><div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;border-bottom:1px solid var(--border);padding-bottom:5px">📓 Journal</div><textarea rows="3" placeholder="Write your thoughts..." style="width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:13px;resize:none;line-height:1.6" oninput="saveInlineJournal('${dateKey}',this.value)"></textarea></div>`,
@@ -3153,6 +3155,125 @@ function buildDailyCompact(dateKey){
     `<button class="emr-btn" onclick="logEmergency('${dateKey}')">🚨 Emergency Log</button>`
   ].join('');
 }
+
+function buildTimeline(dateKey){
+  const d=S.daily[dateKey];
+  if(!d)return'';
+  const wakeMin=d.wakeTime?parseHM(d.wakeTime).h*60+parseHM(d.wakeTime).m:null;
+  const sleepMin=d.sleepTime?parseHM(d.sleepTime).h*60+parseHM(d.sleepTime).m:null;
+  const sess=S.sessions[dateKey]||[];
+
+  // Build events list from sessions + logs
+  const events=[];
+  if(wakeMin!==null)events.push({label:'☀️ Wake',color:'#7ec8e3',start:wakeMin,end:wakeMin,point:true});
+  sess.forEach(s=>{
+    if(!s.ts)return;
+    const endMs=new Date(s.ts).getTime();
+    const endMin=(new Date(s.ts).getUTCHours()*60+new Date(s.ts).getUTCMinutes());
+    const startMin2=endMin-Math.round(s.dur);
+    const color=s.type==='design'||s.type==='games'||s.type==='clients'?'#dfb67e':'#dfb67e';
+    const typeColor={design:'#dfb67e',games:'#dfb67e',clients:'#dfb67e'};
+    events.push({label:(s.type==='design'?'✏':s.type==='games'?'🕹':'👔')+' '+(s.proj||s.type),color:typeColor[s.type]||'#dfb67e',start:startMin2,end:endMin,cat:'work'});
+  });
+  PREP_TYPES.forEach(t=>{
+    const log=d['prep'+t[0].toUpperCase()+t.slice(1)+'Log']||[];
+    log.forEach(dur=>{events.push({label:PREP_ICONS[t]+' '+t[0].toUpperCase()+t.slice(1),color:'#13b5a6',start:wakeMin||420,end:(wakeMin||420)+dur,cat:'prep'});});
+  });
+  ENT_TYPES.forEach(t=>{
+    const log=d['ent'+t[0].toUpperCase()+t.slice(1)+'Log']||[];
+    const names=d['ent'+t[0].toUpperCase()+t.slice(1)+'Names']||[];
+    log.forEach((dur,i)=>{const ico={game:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'}[t];events.push({label:ico+' '+(names[i]||t),color:'#ee4996',start:wakeMin||420,end:(wakeMin||420)+dur,cat:'ent'});});
+  });
+  if(d.snakeDur)events.push({label:'🐍 Heavy',color:'#9b59b6',start:wakeMin||420,end:(wakeMin||420)+d.snakeDur,cat:'snake'});
+  if(d.fireDur)events.push({label:'🧘 Meditate',color:'#ff6b35',start:wakeMin||420,end:(wakeMin||420)+d.fireDur,cat:'med'});
+
+  events.sort((a,b)=>a.start-b.start);
+
+  const cats={work:{color:'#dfb67e',label:'Work'},prep:{color:'#13b5a6',label:'Prep'},ent:{color:'#ee4996',label:'Ent'},snake:{color:'#9b59b6',label:'Heavy'},med:{color:'#ff6b35',label:'Meditate'}};
+
+  function bar(ev,startMin,totalMin){
+    const l=((ev.start-startMin)/totalMin*100).toFixed(2);
+    const w=Math.max(0.5,((ev.end-ev.start)/totalMin*100)).toFixed(2);
+    return`<div style="position:absolute;left:${l}%;width:${w}%;height:100%;background:${ev.color};border-radius:2px" title="${ev.label}"></div>`;
+  }
+
+  function catRow(catKey,startMin,totalMin){
+    const evs=events.filter(e=>e.cat===catKey);
+    if(!evs.length)return'';
+    const c=cats[catKey];
+    return`<div style="position:relative;height:12px;margin:0 0 3px 0">
+      <div style="position:absolute;left:0;width:100%;height:100%;border-radius:2px;background:repeating-linear-gradient(90deg,rgba(150,150,150,0.06) 0px,rgba(150,150,150,0.06) 4px,transparent 4px,transparent 8px)"></div>
+      ${evs.map(e=>bar(e,startMin,totalMin)).join('')}
+      <div style="position:absolute;right:2px;top:1px;font-size:8px;color:${c.color}">${c.label}</div>
+    </div>`;
+  }
+
+  function timeLabels(startMin,totalMin){
+    const hrs=totalMin<=600?[Math.floor(startMin/60),Math.floor(startMin/60)+3,Math.floor(startMin/60)+6,Math.floor(startMin/60)+9]:[0,4,8,12,16,20,23];
+    return hrs.map(h=>{
+      const pct=((h*60-startMin)/totalMin*100);
+      if(pct<0||pct>98)return'';
+      return`<div style="position:absolute;left:${pct.toFixed(1)}%;font-size:9px;color:var(--muted);transform:translateX(-50%)">${pad(h)}:00</div>`;
+    }).join('');
+  }
+
+  const uid='tl'+Math.random().toString(36).slice(2,6);
+  const awakeTotalMin=sleepMin&&wakeMin?(sleepMin>wakeMin?sleepMin-wakeMin:sleepMin+1440-wakeMin):960;
+  const awakeStart=wakeMin||420;
+
+  return`<div style="margin-bottom:12px;padding:10px 12px;background:var(--bg3);border-radius:10px;border:1px solid var(--border)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)">Timeline</div>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+        <span style="font-size:10px;color:var(--muted)" id="tl-lbl-${uid}">Awake only</span>
+        <div id="tl-tog-${uid}" onclick="tlToggle('${uid}')" style="width:28px;height:16px;border-radius:8px;background:var(--border);position:relative;cursor:pointer;transition:background .2s">
+          <div id="tl-knob-${uid}" style="position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--text);transition:left .2s"></div>
+        </div>
+      </label>
+    </div>
+    <div style="position:relative;background:var(--bg2);border-radius:6px;border:1px solid var(--border);padding:5px 0 16px 0" id="tl-grid-${uid}">
+      ${catRow('work',awakeStart,awakeTotalMin)}
+      ${catRow('prep',awakeStart,awakeTotalMin)}
+      ${catRow('ent',awakeStart,awakeTotalMin)}
+      ${catRow('snake',awakeStart,awakeTotalMin)}
+      ${catRow('med',awakeStart,awakeTotalMin)}
+      <div style="position:relative;height:14px">${timeLabels(awakeStart,awakeTotalMin)}</div>
+    </div>
+    <div onclick="tlDetails('${uid}')" style="display:flex;justify-content:space-between;align-items:center;padding:7px 0 2px;cursor:pointer;user-select:none">
+      <span style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Details</span>
+      <span style="font-size:11px;color:var(--muted)" id="tl-arr-${uid}">▾</span>
+    </div>
+    <div id="tl-det-${uid}" style="overflow:hidden;max-height:0;transition:max-height .28s ease;display:flex;flex-direction:column;gap:3px">
+      ${events.map(e=>e.point
+        ?`<div style="display:flex;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;border-left:3px solid ${e.color};background:var(--bg2)"><span style="font-size:10px;color:var(--muted);min-width:70px">${pad(Math.floor(e.start/60))}:${pad(e.start%60)}</span><span style="font-size:11px;color:${e.color};flex:1">${e.label}</span></div>`
+        :`<div style="display:flex;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;border-left:3px solid ${e.color};background:var(--bg2)"><span style="font-size:10px;color:var(--muted);min-width:70px">${pad(Math.floor(e.start/60))}:${pad(e.start%60)}–${pad(Math.floor(e.end/60))}:${pad(e.end%60)}</span><span style="font-size:11px;color:${e.color};flex:1">${e.label}</span><span style="font-size:10px;color:var(--muted)">${fmt(e.end-e.start)}</span></div>`
+      ).join('')}
+    </div>
+  </div>`;
+}
+
+// Add these helpers to global JS scope
+function tlDetails(uid){
+  const det=document.getElementById('tl-det-'+uid);
+  const arr=document.getElementById('tl-arr-'+uid);
+  const open=det.style.maxHeight!=='0px'&&det.style.maxHeight!=='';
+  det.style.maxHeight=open?'0px':det.scrollHeight+'px';
+  arr.textContent=open?'▾':'▴';
+}
+function tlToggle(uid){
+  // Toggle stored per uid — simple approach
+  const lbl=document.getElementById('tl-lbl-'+uid);
+  const tog=document.getElementById('tl-tog-'+uid);
+  const knob=document.getElementById('tl-knob-'+uid);
+  const isFull=lbl.textContent==='Full 24h';
+  lbl.textContent=isFull?'Awake only':'Full 24h';
+  tog.style.background=isFull?'var(--border)':'#7ec8e3';
+  knob.style.left=isFull?'2px':'14px';
+}
+
+
+
+  
 function buildWeeklyCompact(weekStart){
   const ws=new Date(weekStart+'T00:00:00');const days=[];
   for(let i=0;i<7;i++){const d=new Date(ws);d.setDate(d.getDate()+i);days.push(d.toISOString().slice(0,10));}

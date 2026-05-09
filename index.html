@@ -3317,15 +3317,36 @@ function rebuildGridRows(uid,dateKey,startMin,totalMin,isFull){
   });
   PREP_TYPES.forEach(t=>{
     const log=d['prep'+t[0].toUpperCase()+t.slice(1)+'Log']||[];
-    log.forEach(dur=>{events.push({label:PREP_ICONS[t]+' '+t[0].toUpperCase()+t.slice(1),color:'#13b5a6',start:wakeMin||420,end:(wakeMin||420)+dur,cat:'prep'});});
+    log.forEach(entry=>{
+      const dur=typeof entry==='object'?entry.dur:entry;
+      const endMs=typeof entry==='object'?entry.end:null;
+      const endM=endMs?tsToMytMin(endMs):(wakeMin||420)+dur;
+      events.push({label:PREP_ICONS[t]+' '+t[0].toUpperCase()+t.slice(1),color:'#13b5a6',start:endM-dur,end:endM,cat:'prep'});
+    });
   });
   ENT_TYPES.forEach(t=>{
     const log=d['ent'+t[0].toUpperCase()+t.slice(1)+'Log']||[];
     const names=d['ent'+t[0].toUpperCase()+t.slice(1)+'Names']||[];
-    log.forEach((dur,i)=>{const ico={game:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'}[t];events.push({label:ico+' '+(names[i]||t),color:'#ee4996',start:wakeMin||420,end:(wakeMin||420)+dur,cat:'ent'});});
+    const ico={game:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'}[t];
+    log.forEach((entry,i)=>{
+      const dur=typeof entry==='object'?entry.dur:entry;
+      const endMs=typeof entry==='object'?entry.end:null;
+      const endM=endMs?tsToMytMin(endMs):(wakeMin||420)+dur;
+      events.push({label:ico+' '+(names[i]||t),color:'#ee4996',start:endM-dur,end:endM,cat:'ent'});
+    });
   });
-  if(d.snakeDur)events.push({label:'🐍 Heavy',color:'#9b59b6',start:wakeMin||420,end:(wakeMin||420)+d.snakeDur,cat:'snake'});
-  if(d.fireDur)events.push({label:'🧘 Meditate',color:'#ff6b35',start:wakeMin||420,end:(wakeMin||420)+d.fireDur,cat:'med'});
+  (d.snakeLog||[]).forEach(entry=>{
+    const dur=typeof entry==='object'?entry.dur:entry;
+    const endMs=typeof entry==='object'?entry.end:null;
+    const endM=endMs?tsToMytMin(endMs):(wakeMin||420)+dur;
+    events.push({label:'🐍 Heavy',color:'#9b59b6',start:endM-dur,end:endM,cat:'snake'});
+  });
+  (d.fireLog||[]).forEach(entry=>{
+    const dur=typeof entry==='object'?entry.dur:entry;
+    const endMs=typeof entry==='object'?entry.end:null;
+    const endM=endMs?tsToMytMin(endMs):(wakeMin||420)+dur;
+    events.push({label:'🧘 Meditate',color:'#ff6b35',start:endM-dur,end:endM,cat:'med'});
+  });
 
   events.sort((a,b)=>a.start-b.start);
 

@@ -3308,13 +3308,12 @@ function rebuildGridRows(uid,dateKey,startMin,totalMin,isFull){
   if(wakeMin!==null)events.push({label:'☀️ Wake',color:'#7ec8e3',start:wakeMin,end:wakeMin,point:true});
   sess.forEach(s=>{
     if(!s.ts)return;
-    const endMs=new Date(s.ts).getTime();
-    const endMin=(new Date(s.ts).getUTCHours()*60+new Date(s.ts).getUTCMinutes());
+    const endMin=tsToMytMin(new Date(s.ts).getTime());
     const startMin2=endMin-Math.round(s.dur);
-    const color=s.type==='design'||s.type==='games'||s.type==='clients'?'#dfb67e':'#dfb67e';
     const typeColor={design:'#dfb67e',games:'#dfb67e',clients:'#dfb67e'};
     events.push({label:(s.type==='design'?'✏':s.type==='games'?'🕹':'👔')+' '+(s.proj||s.type),color:typeColor[s.type]||'#dfb67e',start:startMin2,end:endMin,cat:'work'});
   });
+  
   PREP_TYPES.forEach(t=>{
     const log=d['prep'+t[0].toUpperCase()+t.slice(1)+'Log']||[];
     log.forEach(entry=>{

@@ -3431,13 +3431,12 @@ function tlToggle(uid){
   if(lbl)lbl.textContent=isFull?'Full 24h':'Awake only';
   if(tog)tog.style.background=isFull?'#7ec8e3':'var(--border)';
   if(knob)knob.style.left=isFull?'14px':'2px';
-  // Re-render grid
   const grid=document.getElementById('tl-grid-'+uid);
-  if(!grid)return;
-  const dateKey=grid.dataset.datekey;
-  if(!dateKey)return;
+  if(!grid){console.warn('tl-grid-'+uid+' not found');return;}
+  const dateKey=grid.getAttribute('data-datekey');
+  if(!dateKey){console.warn('no datekey on grid');return;}
   const d=S.daily[dateKey];
-  if(!d)return;
+  if(!d){console.warn('no day data for '+dateKey);return;}
   const wakeMin=d.wakeTime?(parseHM(d.wakeTime).h*60+parseHM(d.wakeTime).m):420;
   const sleepMin=d.sleepTime?(parseHM(d.sleepTime).h*60+parseHM(d.sleepTime).m):1380;
   const startMin=isFull?0:wakeMin;

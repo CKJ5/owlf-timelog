@@ -766,6 +766,26 @@ function installPWA(){
         <span>💾 Data</span><span class="set-group-arrow" id="arr-sg-data">▾</span>
       </div>
       <div class="set-group-body" id="sg-data">
+
+        <!-- LOCAL DATA -->
+        <div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)">📱 Local Data — Offline</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button onclick="exportData()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">↑ Export</button>
+          <button onclick="document.getElementById('imp-file').click()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">↓ Import</button>
+          <input type="file" id="imp-file" accept=".json" style="display:none" onchange="importData(event)">
+        </div>
+        <button onclick="clearAllData()" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid #c0392b;background:transparent;color:#c0392b;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;cursor:pointer">🗑 Clear All Local Data</button>
+
+        <!-- CLOUD SYNC -->
+        <div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:16px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)">☁ Sync Data — Online</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px" id="fb-auth-lbl">Not signed in</div>
+        <button id="fb-auth-btn" onclick="signInGoogle()" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #4285f4;background:var(--bg3);color:#4285f4;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:6px">🔑 Sign in with Google</button>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:8px" id="fb-sync-lbl"></div>
+        <button onclick="deleteFirestoreData()" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid #c0392b;background:transparent;color:#c0392b;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;cursor:pointer">🗑 Delete Cloud Data</button>
+
+      </div>
+    </div>
+    
         <div style="margin-bottom:12px">
             <div class="mlbl" style="margin-bottom:6px">Cloud Sync (Firestore)</div>
             <div style="font-size:11px;color:var(--muted);margin-bottom:6px" id="fb-auth-lbl">Not signed in</div>
@@ -1504,7 +1524,6 @@ function showSettings(){
   updateSettingsWeekStart();
   renderPtypeChips();
   renderStylePicker();
-  updateGdriveUI(); // add this line
   document.getElementById('settings-overlay').classList.remove('hidden');
 
   loadNotifPrefs();
@@ -2106,156 +2125,6 @@ function importData(e){
 }
 
 
-  // ═══ GOOGLE DRIVE BACKUP ═══
-const GDRIVE_CLIENT_ID = '444516554695-rimfoaoel6r3abotuhaaabar7e05891h.apps.googleusercontent.com';
-const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
-let _gdriveToken = null;
-let _autoBackupTimer = null;
-
-function gdriveStatus(msg, color){
-  const el = document.getElementById('gdrive-status');
-  if(el){el.textContent=msg; el.style.color=color||'var(--muted)';}
-}
-
-function connectGoogleDrive(){
-  const url = 'https://accounts.google.com/o/oauth2/v2/auth'
-    + '?client_id=' + GDRIVE_CLIENT_ID
-    + '&redirect_uri=' + encodeURIComponent(location.origin + location.pathname)
-    + '&response_type=token'
-    + '&scope=' + encodeURIComponent(GDRIVE_SCOPE);
-  window.open(url, '_blank', 'width=500,height=600');
-  gdriveStatus('Waiting for Google login...', 'var(--work)');
-}
-
-// Handle OAuth redirect — runs once on load, never touches S
-(function(){
-  const hash = location.hash;
-  if(hash.includes('access_token')){
-    const params = new URLSearchParams(hash.slice(1));
-    const token = params.get('access_token');
-    if(token){
-      _gdriveToken = token;
-      localStorage.setItem('owlf_gdrive_token', token);
-      history.replaceState(null, '', location.pathname); // clean URL without reload
-      setTimeout(()=>{
-        gdriveStatus('✓ Google Drive connected!', '#27ae60');
-        const btn = document.getElementById('gdrive-connect-btn');
-        if(btn){btn.textContent='✓ Connected';btn.style.borderColor='#27ae60';btn.style.color='#27ae60';}
-      }, 500);
-    }
-  } else {
-    const saved = localStorage.getItem('owlf_gdrive_token');
-    if(saved) _gdriveToken = saved;
-  }
-})();
-
-// Update connect button state on settings open
-function updateGdriveUI(){
-  const btn = document.getElementById('gdrive-connect-btn');
-  const autoBtn = document.getElementById('auto-backup-btn');
-  const lastBackup = localStorage.getItem('owlf_last_backup');
-  const isAuto = localStorage.getItem('owlf_auto_backup') === '1';
-  if(_gdriveToken){
-    if(btn){btn.textContent='✓ Connected';btn.style.borderColor='#27ae60';btn.style.color='#27ae60';}
-  } else {
-    if(btn){btn.textContent='🔗 Connect Google Drive';btn.style.borderColor='#4285f4';btn.style.color='#4285f4';}
-  }
-  if(autoBtn){
-    autoBtn.textContent = isAuto ? '⏰ Auto: ON' : '⏰ Auto: OFF';
-    autoBtn.style.color = isAuto ? 'var(--work)' : 'var(--muted)';
-  }
-  if(lastBackup){
-    gdriveStatus('Last backup: ' + lastBackup);
-  }
-}
-
-async function backupNow(){
-  if(!_gdriveToken){
-    // Try loading from storage one more time
-    _gdriveToken = localStorage.getItem('owlf_gdrive_token');
-    if(!_gdriveToken){gdriveStatus('⚠ Connect Google Drive first', '#e74c3c');return;}
-  }
-  gdriveStatus('Uploading...', 'var(--work)');
-  const data = JSON.stringify(S, null, 2);
-  try{
-    // Find existing file
-    const search = await fetch(
-      'https://www.googleapis.com/drive/v3/files?q=name%3D%27owlf-backup-latest.json%27&spaces=drive',
-      {headers:{Authorization:'Bearer ' + _gdriveToken}}
-    );
-    if(search.status === 401){
-      _gdriveToken = null;
-      localStorage.removeItem('owlf_gdrive_token');
-      gdriveStatus('⚠ Session expired — reconnect Drive', '#e74c3c');
-      updateGdriveUI();
-      return;
-    }
-    const searchRes = await search.json();
-    const existingId = searchRes.files && searchRes.files[0] && searchRes.files[0].id;
-
-    const meta = {name:'owlf-backup-latest.json', mimeType:'application/json'};
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(meta)], {type:'application/json'}));
-    form.append('file', new Blob([data], {type:'application/json'}));
-
-    const method = existingId ? 'PATCH' : 'POST';
-    const url = existingId
-      ? 'https://www.googleapis.com/upload/drive/v3/files/' + existingId + '?uploadType=multipart'
-      : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-
-    const res = await fetch(url, {
-      method,
-      headers:{Authorization:'Bearer ' + _gdriveToken},
-      body: form
-    });
-
-    if(res.ok){
-      const backupTime = new Date().toLocaleString();
-      localStorage.setItem('owlf_last_backup', backupTime);
-      gdriveStatus('✓ Backed up: ' + backupTime, '#27ae60');
-    } else if(res.status === 401){
-      _gdriveToken = null;
-      localStorage.removeItem('owlf_gdrive_token');
-      gdriveStatus('⚠ Session expired — reconnect Drive', '#e74c3c');
-      updateGdriveUI();
-    } else {
-      const err = await res.json().catch(()=>({}));
-      gdriveStatus('⚠ Failed: ' + (err.error&&err.error.message||res.status), '#e74c3c');
-    }
-  } catch(e){
-    gdriveStatus('⚠ Network error', '#e74c3c');
-  }
-}
-
-function toggleAutoBackup(){
-  const cur = localStorage.getItem('owlf_auto_backup') === '1';
-  localStorage.setItem('owlf_auto_backup', cur ? '0' : '1');
-  updateGdriveUI();
-  if(!cur){
-    scheduleAutoBackup();
-  } else {
-    if(_autoBackupTimer) clearInterval(_autoBackupTimer);
-  }
-}
-
-function scheduleAutoBackup(){
-  if(_autoBackupTimer) clearInterval(_autoBackupTimer);
-  if(localStorage.getItem('owlf_auto_backup') !== '1') return;
-  // Check every hour, backup at 2am MYT
-  _autoBackupTimer = setInterval(()=>{
-    const now = myDate();
-    if(now.getUTCHours() === 2){
-      backupNow();
-    }
-  }, 60 * 60 * 1000);
-}
-
-// Init auto backup on app load
-(function(){
-  if(localStorage.getItem('owlf_auto_backup') === '1'){
-    scheduleAutoBackup();
-  }
-})();
 
   
 // ═══ UI UPDATES ═══
@@ -4366,11 +4235,29 @@ function showMedalCalendar(mo){
 
 
 // ═══ CLEAR ALL DATA ═══
+async function deleteFirestoreData(){
+  if(!_uid){alert('Not signed in to Firestore.');return;}
+  if(!confirm('⚠️ Delete ALL cloud data from Firestore?\nThis cannot be undone.'))return;
+  try{
+    const days=await db.collection(`users/${_uid}/days`).get();
+    const sess=await db.collection(`users/${_uid}/sessions`).get();
+    const batch=db.batch();
+    days.forEach(doc=>batch.delete(doc.ref));
+    sess.forEach(doc=>batch.delete(doc.ref));
+    batch.delete(db.doc(`users/${_uid}/meta/data`));
+    await batch.commit();
+    alert('Cloud data deleted.');
+  }catch(e){alert('Failed: '+e.message);}
+}
+
+
+  
 function clearAllData(){
-  if(!confirm('⚠️ WARNING: This will permanently delete ALL your data.\nThis cannot be undone.\n\nAre you absolutely sure?'))return;
+  if(!confirm('⚠️ WARNING: This will permanently delete ALL local data.\nThis cannot be undone.\n\nAre you absolutely sure?'))return;
   if(!confirm('🚨 FINAL WARNING: All sessions, journals, streaks, and settings will be erased forever.\n\nPress OK to confirm deletion.'))return;
   localStorage.removeItem(KEY);
-  alert('All data cleared.');location.reload();
+  if(auth)auth.signOut().catch(()=>{});
+  alert('All local data cleared.');location.reload();
 }
 
 // ═══ INLINE JOURNAL ═══

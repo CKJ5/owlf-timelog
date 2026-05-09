@@ -23,8 +23,7 @@ self.addEventListener('message', e => {
   if (!e.data) return;
 
   // Show a single notification
-  if (e.data.type === 'CLEAR') {
-    if(Notification.permission!=='granted')return;
+  if (e.data.type === 'NOTIFY') {
     const { title, body, tag } = e.data;
     e.waitUntil(self.registration.showNotification(title, { {
       body, tag,

@@ -25,7 +25,7 @@ self.addEventListener('message', e => {
   // Show a single notification
   if (e.data.type === 'NOTIFY') {
     const { title, body, tag } = e.data;
-    e.waitUntil(self.registration.showNotification(title, { {
+    e.waitUntil(self.registration.showNotification(title, {
       body, tag,
       icon: './icon-192.png',
       badge: './badge-72.png',

@@ -3407,7 +3407,7 @@ function rebuildGridRows(uid,dateKey,startMin,totalMin,isFull){
     <div id="tl-det-${uid}" style="overflow:hidden;max-height:0;transition:max-height .28s ease;display:flex;flex-direction:column;gap:3px">
       ${events.map(e=>e.point
         ?`<div style="display:flex;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;border-left:3px solid ${e.color};background:var(--bg2)"><span style="font-size:10px;color:var(--muted);min-width:70px">${pad(Math.floor(e.start/60))}:${pad(e.start%60)}</span><span style="font-size:11px;color:${e.color};flex:1">${e.label}</span></div>`
-        :`<div style="display:flex;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;border-left:3px solid ${e.color};background:var(--bg2)"><span style="font-size:10px;color:var(--muted);min-width:70px">${pad(Math.floor(e.start/60))}:${pad(e.start%60)}–${pad(Math.floor(e.end/60))}:${pad(e.end%60)}</span><span style="font-size:11px;color:${e.color};flex:1">${e.label}</span><span style="font-size:10px;color:var(--muted)">${fmt(e.end-e.start)}</span></div>`
+        :`<div style="display:flex;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;border-left:3px solid ${e.color};background:var(--bg2)"><span style="font-size:10px;color:var(--muted);min-width:70px">${pad(Math.floor(Math.max(0,e.start)/60))}:${pad(Math.max(0,e.start)%60)}–${pad(Math.floor(Math.max(0,e.end)/60))}:${pad(Math.max(0,e.end)%60)}</span><span style="font-size:11px;color:${e.color};flex:1">${e.label}</span><span style="font-size:10px;color:var(--muted)">${fmt(Math.max(0,e.end-e.start))}</span></div>`
       ).join('')}
     </div>
   </div>`;

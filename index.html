@@ -786,37 +786,7 @@ function installPWA(){
       </div>
     </div>
     
-        <div style="margin-bottom:12px">
-            <div class="mlbl" style="margin-bottom:6px">Cloud Sync (Firestore)</div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:6px" id="fb-auth-lbl">Not signed in</div>
-            <button id="fb-auth-btn" onclick="signInGoogle()" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #4285f4;background:var(--bg3);color:#4285f4;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:6px">🔑 Sign in with Google</button>
-            <div style="font-size:10px;color:var(--muted)" id="fb-sync-lbl"></div>
-        </div>
         
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <button onclick="exportData()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">↑ Export</button>
-          <button onclick="document.getElementById('imp-file').click()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">↓ Import</button>
-          <input type="file" id="imp-file" accept=".json" style="display:none" onchange="importData(event)">
-        </div>
-
-        <div style="margin-top:10px">
-  <div class="mlbl" style="margin-bottom:6px">Auto Backup to Google Drive</div>
-  <button onclick="connectGoogleDrive()" id="gdrive-connect-btn" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid #4285f4;background:var(--bg3);color:#4285f4;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;cursor:pointer;text-align:left">
-    🔗 Connect Google Drive
-  </button>
-  <div style="display:flex;gap:8px;margin-top:6px">
-    <button onclick="backupNow()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">☁ Backup Now</button>
-    <button onclick="toggleAutoBackup()" id="auto-backup-btn" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">⏰ Auto: OFF</button>
-  </div>
-  <div id="gdrive-status" style="font-size:11px;color:var(--muted);margin-top:5px;padding:0 2px"></div>
-</div>
-
-
-        
-        <button onclick="clearAllData()" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid #c0392b;background:transparent;color:#c0392b;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;cursor:pointer">🗑 Clear All Data</button>
-      </div>
-    </div>
-
     <div class="mbtns" style="margin-top:14px"><button class="bcanc" onclick="document.getElementById('settings-overlay').classList.add('hidden')">Close</button></div>
   </div>
 </div>

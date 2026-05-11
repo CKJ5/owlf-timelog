@@ -1590,6 +1590,8 @@ function updateActiveNotifications(){
   const sa=S.active['snake'];if(sa)active.push({label:'🐍 Snake',color:'var(--snake)',start:sa.start});
   ['game','show','outdoor'].forEach(t=>{const a=S.active['ent_'+t];if(a){const ico=t==='game'?'🎮':t==='show'?'📺':'🌿';active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
   ['cook','meal','transport','sport','shower','other'].forEach(t=>{const a=S.active['prep_'+t];if(a){const ico={cook:'🍳',meal:'🍱',transport:'🚗',sport:'⚽',shower:'🚿',other:'📦'}[t];active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
+  CARDIO_TYPES.forEach(t=>{const a=S.active['cardio_'+t];if(a){const ico={jogging:'🏃',cycling:'🚴',hiit:'🔥'}[t];active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
+  
   // Update in-app banner
   const banner=document.getElementById('active-banner');
   const itemsEl=document.getElementById('active-banner-items');
@@ -1613,6 +1615,7 @@ setInterval(()=>{
   const sa2=S.active['snake'];if(sa2)acts.push({label:'Heavy',color:'var(--snake)',start:sa2.start});
   ['game','show','outdoor'].forEach(t=>{const a=S.active['ent_'+t];if(a){const ico=t==='game'?'🎮':t==='show'?'📺':'🌿';acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
   ['cook','meal','transport','sport','shower','other'].forEach(t=>{const a=S.active['prep_'+t];if(a){const ico={cook:'🍳',meal:'🍱',transport:'🚗',sport:'⚽',shower:'🚿',other:'📦'}[t];acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
+  CARDIO_TYPES.forEach(t=>{const a=S.active['cardio_'+t];if(a){const ico={jogging:'🏃',cycling:'🚴',hiit:'🔥'}[t];acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
   const banner=document.getElementById('active-banner');
   const itemsEl=document.getElementById('active-banner-items');
   if(acts.length){

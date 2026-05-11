@@ -1132,7 +1132,7 @@ function installPWA(){
     <div class="ex-grid">
       <div class="ex-btn" onclick="addEx('abs')"><div class="ex-name">腹肌</div><div class="ex-count" id="exc-abs">0</div><div class="ex-sub" id="exs-abs">—</div></div>
       <div class="ex-btn" onclick="addEx('bicep')"><div class="ex-name">二头</div><div class="ex-count" id="exc-bicep">0</div><div class="ex-sub" id="exs-bicep">—</div></div>
-      <div class="ex-btn" onclick="addEx('pu')"><div class="ex-name">PU</div><div class="ex-count" id="exc-pu">0</div><div class="ex-sub" id="exs-pu">—</div></div>
+      <div class="ex-btn" onclick="addEx('pu')"><div class="ex-name">PushUp</div><div class="ex-count" id="exc-pu">0</div><div class="ex-sub" id="exs-pu">—</div></div>
       <div class="ex-btn" onclick="addEx('bench')"><div class="ex-name">卧推</div><div class="ex-count" id="exc-bench">0</div><div class="ex-sub" id="exs-bench">—</div></div>
       <div class="ex-btn" onclick="addEx('jian')"><div class="ex-name">肩</div><div class="ex-count" id="exc-jian">0</div><div class="ex-sub" id="exs-jian">—</div></div>
       <div class="ex-btn" onclick="addEx('bei')"><div class="ex-name">背</div><div class="ex-count" id="exc-bei">0</div><div class="ex-sub" id="exs-bei">—</div></div>
@@ -2022,7 +2022,7 @@ function togglePrep(type){
     S.active['prep_'+type]={start:nowTs()};save();updateLifeUI();
   }
 }
-const EX_LABELS={abs:'腹肌',bicep:'二头',pu:'PU',bench:'卧推',jian:'肩',bei:'背'};
+const EX_LABELS={abs:'腹肌',bicep:'二头',pu:'PushUp',bench:'卧推',jian:'肩',bei:'背'};
 const EX_KEYS=Object.keys(EX_LABELS);
 function addEx(type){
   showModal(`<h3 style="color:var(--ex)">${EX_LABELS[type]}</h3><label class="mlbl">Times (sets e.g. 15+15)</label><input type="text" id="ex-inp" placeholder="e.g. 20 or 15+15" style="border-color:var(--ex)" autofocus><div class="mbtns" style="margin-top:6px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf bex" onclick="saveEx('${type}')">Add</button></div>`,null);
@@ -2443,7 +2443,7 @@ const RATIO_PAGES={
     items:[
       {key:'abs',   label:'腹肌 Abs',   color:'var(--ex)', fn:d=>d.abs||0},
       {key:'bicep', label:'二头 Bicep', color:'#27ae60',   fn:d=>d.bicep||0},
-      {key:'pu',    label:'PU',         color:'#2980b9',   fn:d=>d.pu||0},
+      {key:'pu',    label:'PushUp',         color:'#2980b9',   fn:d=>d.pu||0},
       {key:'bench', label:'卧推 Bench', color:'#8e44ad',   fn:d=>d.bench||0},
       {key:'jian',  label:'肩 Shoulder',color:'#e67e22',   fn:d=>d.jian||0},
       {key:'bei',   label:'背 Back',    color:'#c0392b',   fn:d=>d.bei||0},

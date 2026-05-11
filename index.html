@@ -1030,10 +1030,10 @@ function installPWA(){
     <div class="card-collapse-body" id="ent-body" style="max-height:0px; margin-bottom: -10px;">
     <!-- 3 ENT BUTTONS: Play / Show / Outdoor -->
     <div class="ent-row">
-      <button class="ent-btn" id="ebt-game" onclick="toggleEnt('play')">
+      <button class="ent-btn" id="ebt-play" onclick="toggleEnt('play')">
         <div>🎮 Play</div>
-        <div class="ent-timer" id="etimer-game" style="display:none">—</div>
-        <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace" id="edur-game">0m</div>
+        <div class="ent-timer" id="etimer-play" style="display:none">—</div>
+        <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace" id="edur-play">0m</div>
       </button>
       <button class="ent-btn" id="ebt-show" onclick="toggleEnt('show')">
         <div>📺 Show</div>
@@ -2417,7 +2417,7 @@ const RATIO_PAGES={
     label:'🌙 Life',color:'var(--life)',
     group:{key:'ent',label:'All Entertainment',color:'var(--life)',fn:d=>entTotalDay(d)},
     items:[
-      {key:'entgame',   label:'🎮 Play',    color:'#ee4996', fn:d=>d.entGame||0},
+      {key:'entplay',   label:'🎮 Play',    color:'#ee4996', fn:d=>d.entGame||0},
       {key:'entshow',   label:'📺 Show',    color:'#c0392b', fn:d=>d.entShow||0},
       {key:'entoutdoor',label:'🌿 Outdoor', color:'#27ae60', fn:d=>d.entOutdoor||0},
       {key:'entclean',  label:'🧹 Clean',   color:'#7f8c8d', fn:d=>d.entClean||0},

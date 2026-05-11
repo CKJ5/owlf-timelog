@@ -1387,8 +1387,8 @@ function loadS(){
     if(EMPTY.includes(k)&&(!v||!v.length))return;
     if(k==='hadFire'&&!v)return;
     if(k==='exHit'&&!v)return;
-    if(k==='wakeTime'&&v===null)return;
-    if(k==='sleepTime'&&v===null)return;
+    if(k==='sleepTime'&&!v)return;
+    if(k==='wakeTime'&&!v)return;
     if(k==='sleepHours'&&v===null)return;
     if(k==='wasted'&&!v.design&&!v.games&&!v.clients)return;
     if(k==='type'&&!v)return;

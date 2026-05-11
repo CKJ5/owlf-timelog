@@ -589,7 +589,7 @@ function installPWA(){
     <div id="wu-type-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
     <input type="text" id="wu-type" placeholder="Or type custom..." style="border-color:var(--work);margin-bottom:10px">
     <label class="mlbl">Today's Plan</label>
-    <input type="text" id="wu-plan" placeholder="e.g. Finish logo, Game jam..." style="border-color:var(--work)">
+    <input type="text" id="wu-plan" placeholder="e.g. Finish logo, Play jam..." style="border-color:var(--work)">
     <div class="mbtns"><button class="bconf" onclick="saveWakeup()">Start Day →</button></div>
   </div>
 </div>
@@ -617,7 +617,7 @@ function installPWA(){
       <button class="cmp-tog-btn" onclick="toggleCmpMetric('clients',this)">👔 Clients</button>
       <button class="cmp-tog-btn" onclick="toggleCmpMetric('heavy',this)">🏋 Heavy</button>
       <button class="cmp-tog-btn" onclick="toggleCmpMetric('show',this)">📺 Show</button>
-      <button class="cmp-tog-btn" onclick="toggleCmpMetric('game',this)">🎮 Game</button>
+      <button class="cmp-tog-btn" onclick="toggleCmpMetric('play',this)">🎮 Play</button>
       <button class="cmp-tog-btn" onclick="toggleCmpMetric('meditation',this)">🧘 Meditate</button>
     </div>
     <div id="cmp-chart-area"></div>
@@ -1028,10 +1028,10 @@ function installPWA(){
       </div>
     </div>
     <div class="card-collapse-body" id="ent-body" style="max-height:0px; margin-bottom: -10px;">
-    <!-- 3 ENT BUTTONS: Game / Show / Outdoor -->
+    <!-- 3 ENT BUTTONS: Play / Show / Outdoor -->
     <div class="ent-row">
-      <button class="ent-btn" id="ebt-game" onclick="toggleEnt('game')">
-        <div>🎮 Game</div>
+      <button class="ent-btn" id="ebt-game" onclick="toggleEnt('play')">
+        <div>🎮 Play</div>
         <div class="ent-timer" id="etimer-game" style="display:none">—</div>
         <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace" id="edur-game">0m</div>
       </button>
@@ -1588,7 +1588,7 @@ function updateActiveNotifications(){
   WTYPES.forEach(t=>{const a=S.active['w_'+t];if(a){active.push({label:t[0].toUpperCase()+t.slice(1)+(a.proj?' ('+a.proj+')':''),color:'var(--work)',start:a.start});}});
   const fa=S.active['fire'];if(fa)active.push({label:'🧘 Meditation',color:'var(--fire-c)',start:fa.start});
   const sa=S.active['snake'];if(sa)active.push({label:'🐍 Snake',color:'var(--snake)',start:sa.start});
-  ['game','show','outdoor'].forEach(t=>{const a=S.active['ent_'+t];if(a){const ico=t==='game'?'🎮':t==='show'?'📺':'🌿';active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
+  ['play','show','outdoor'].forEach(t=>{const a=S.active['ent_'+t];if(a){const ico=t==='play'?'🎮':t==='show'?'📺':'🌿';active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
   ['cook','meal','transport','sport','shower','other'].forEach(t=>{const a=S.active['prep_'+t];if(a){const ico={cook:'🍳',meal:'🍱',transport:'🚗',sport:'⚽',shower:'🚿',other:'📦'}[t];active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
   CARDIO_TYPES.forEach(t=>{const a=S.active['cardio_'+t];if(a){const ico={jogging:'🏃',cycling:'🚴',hiit:'🔥'}[t];active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
   
@@ -1613,7 +1613,7 @@ setInterval(()=>{
   WTYPES2.forEach(t=>{const a=S.active['w_'+t];if(a)acts.push({label:t[0].toUpperCase()+t.slice(1)+(a.proj?' ('+a.proj+')':''),color:'var(--work)',start:a.start});});
   const fa2=S.active['fire'];if(fa2)acts.push({label:'Meditation',color:'var(--fire-c)',start:fa2.start});
   const sa2=S.active['snake'];if(sa2)acts.push({label:'Heavy',color:'var(--snake)',start:sa2.start});
-  ['game','show','outdoor'].forEach(t=>{const a=S.active['ent_'+t];if(a){const ico=t==='game'?'🎮':t==='show'?'📺':'🌿';acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
+  ['play','show','outdoor'].forEach(t=>{const a=S.active['ent_'+t];if(a){const ico=t==='play'?'🎮':t==='show'?'📺':'🌿';acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
   ['cook','meal','transport','sport','shower','other'].forEach(t=>{const a=S.active['prep_'+t];if(a){const ico={cook:'🍳',meal:'🍱',transport:'🚗',sport:'⚽',shower:'🚿',other:'📦'}[t];acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
   CARDIO_TYPES.forEach(t=>{const a=S.active['cardio_'+t];if(a){const ico={jogging:'🏃',cycling:'🚴',hiit:'🔥'}[t];acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
   const banner=document.getElementById('active-banner');
@@ -1931,7 +1931,7 @@ function getSleepAdvice(){
 }
 
 // ═══ ENTERTAINMENT (6 types) ═══
-const ENT_TYPES=['game','show','outdoor','clean','laydown','date'];
+const ENT_TYPES=['play','show','outdoor','clean','laydown','date'];
 function toggleEnt(type){
   const a=S.active['ent_'+type];
   if(a){
@@ -1944,8 +1944,8 @@ function toggleEnt(type){
     if(el>0)d['ent'+cap+'Log'].push({dur:el,end:nowTs()});
     delete S.active['ent_'+type];save();updateLifeUI();
   } else {
-    const icons={game:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'};
-    showModal(`<h3 style="color:var(--life)">${icons[type]} ${type[0].toUpperCase()+type.slice(1)}</h3><label class="mlbl">Name</label><input type="text" id="ent-nm" placeholder="${type==='game'?'Game name':'Show / place name'}..." style="border-color:var(--life)"><div class="mbtns"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf blife" onclick="startEnt('${type}')">Start</button></div>`,null);
+    const icons={play:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'};
+    showModal(`<h3 style="color:var(--life)">${icons[type]} ${type[0].toUpperCase()+type.slice(1)}</h3><label class="mlbl">Name</label><input type="text" id="ent-nm" placeholder="${type==='play'?'Play name':'Show / place name'}..." style="border-color:var(--life)"><div class="mbtns"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf blife" onclick="startEnt('${type}')">Start</button></div>`,null);
   }
 }
 function startEnt(type){
@@ -2417,7 +2417,7 @@ const RATIO_PAGES={
     label:'🌙 Life',color:'var(--life)',
     group:{key:'ent',label:'All Entertainment',color:'var(--life)',fn:d=>entTotalDay(d)},
     items:[
-      {key:'entgame',   label:'🎮 Game',    color:'#ee4996', fn:d=>d.entGame||0},
+      {key:'entgame',   label:'🎮 Play',    color:'#ee4996', fn:d=>d.entGame||0},
       {key:'entshow',   label:'📺 Show',    color:'#c0392b', fn:d=>d.entShow||0},
       {key:'entoutdoor',label:'🌿 Outdoor', color:'#27ae60', fn:d=>d.entOutdoor||0},
       {key:'entclean',  label:'🧹 Clean',   color:'#7f8c8d', fn:d=>d.entClean||0},
@@ -3024,7 +3024,7 @@ function buildDailyCompact(dateKey){
       ['Wake',d.wakeTime||'—','var(--life)'],
       ['Sleep',d.sleepHours?fmtH(d.sleepHours):'—','var(--life)'],
       ['Entertainment',fmt(entT),'var(--life)'],
-      ['🎮 Game',fmtLog(d.entGameLog)],
+      ['🎮 Play',fmtLog(d.entGameLog)],
       ['📺 Show',fmtLog(d.entShowLog)],
       ['🌿 Out',fmtLog(d.entOutdoorLog)],
       ['🧹 Clean',fmtLog(d.entCleanLog)],
@@ -3088,7 +3088,7 @@ function buildTimeline(dateKey){
   ENT_TYPES.forEach(t=>{
     const log=d['ent'+t[0].toUpperCase()+t.slice(1)+'Log']||[];
     const names=d['ent'+t[0].toUpperCase()+t.slice(1)+'Names']||[];
-    const ico={game:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'}[t];
+    const ico={play:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'}[t];
     log.forEach((entry,i)=>{
       const dur=typeof entry==='object'?entry.dur:entry;
       const endMs=typeof entry==='object'?entry.end:null;
@@ -3208,7 +3208,7 @@ function rebuildGridRows(uid,dateKey,startMin,totalMin,isFull){
   ENT_TYPES.forEach(t=>{
     const log=d['ent'+t[0].toUpperCase()+t.slice(1)+'Log']||[];
     const names=d['ent'+t[0].toUpperCase()+t.slice(1)+'Names']||[];
-    const ico={game:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'}[t];
+    const ico={play:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'}[t];
     log.forEach((entry,i)=>{
       const dur=typeof entry==='object'?entry.dur:entry;
       const endMs=typeof entry==='object'?entry.end:null;
@@ -3296,7 +3296,7 @@ function buildMonthlyCompact(mo){
   return [
     compactSec('💼 Work','var(--work)',[['Total',fmt(workTotal),'var(--work)'],['Avg/Day',fmt(Math.round(workTotal/n)),'var(--work)'],['3h+ Days',over3,'var(--work)'],['Design',fmt(dT)],['Games',fmt(gT)],['Clients',fmt(cT)],['Wasted',fmt(wstT),'var(--muted)']]),
     projRows.length?compactSec('📁 Projects','var(--work)',projRows):'',
-    compactSec('🌙 Life','var(--life)',[['Sleep Avg',slD?fmtH(slH/slD):'—','var(--life)'],['Ent. Total',fmt(entTotal),'var(--life)'],['Ent. Avg/Day',fmt(Math.round(entTotal/n)),'var(--life)'],['🎮 Game',fmt(entGame)],['📺 Show',fmt(entShow)],['🌿 Out',fmt(entOut)],['Meditation ×',fireC,'var(--fire-c)'],['Meditate Dur',fmt(fireDur),'var(--fire-c)'],['Heavy',snS+'× — '+fmt(snD),'var(--snake)']]),
+    compactSec('🌙 Life','var(--life)',[['Sleep Avg',slD?fmtH(slH/slD):'—','var(--life)'],['Ent. Total',fmt(entTotal),'var(--life)'],['Ent. Avg/Day',fmt(Math.round(entTotal/n)),'var(--life)'],['🎮 Play',fmt(entGame)],['📺 Show',fmt(entShow)],['🌿 Out',fmt(entOut)],['Meditation ×',fireC,'var(--fire-c)'],['Meditate Dur',fmt(fireDur),'var(--fire-c)'],['Heavy',snS+'× — '+fmt(snD),'var(--snake)']]),
     compactSec('💪 Exercise','var(--ex)',[['Target Days',exHit,'var(--ex)'],['Total',exT,'var(--ex)'],['Avg/Day',Math.round(exT/n),'var(--ex)'],['♦ Perfect Days',days.filter(k=>checkDailyTriple(k)).length,'var(--work)']])
   ].join('');
 }
@@ -3341,7 +3341,7 @@ function buildDaily(dateKey){
     <div class="rrow"><span>Wake</span><span class="rval life-color">${d.wakeTime||'—'}</span></div>
     <div class="rrow"><span>Sleep (last night)</span><span class="rval life-color">${d.sleepHours?fmtH(d.sleepHours):'—'}</span></div>
     <div class="rrow"><span>Entertainment</span><span class="rval life-color">${fmt(entT)}</span></div>
-    <div class="rrow"><span>🎮 Game</span><span class="rval">${fmt(d.entGame||0)}</span></div>
+    <div class="rrow"><span>🎮 Play</span><span class="rval">${fmt(d.entGame||0)}</span></div>
     <div class="rrow"><span>📺 Show</span><span class="rval">${fmt(d.entShow||0)}</span></div>
     <div class="rrow"><span>🌿 Outdoor</span><span class="rval">${fmt(d.entOutdoor||0)}</span></div>
     <div class="rrow"><span>Meditation</span><span class="rval" style="color:${d.hadFire?'#ff4444':'#13b5a6'}">${d.hadFire?'Yes ×'+(d.fireCount||0)+' ('+fmt(d.fireDur||0)+')':'Clean ✓'}</span></div>
@@ -3411,7 +3411,7 @@ function buildMonthly(mo){
   <div class="report-sec">
     <div class="rtitle" style="color:var(--life)">Life — ${fmtMo(mo)}</div>
     <div class="sr3"><div class="sbox"><div class="snum life-color">${slD?fmtH(slH/slD):'—'}</div><div class="slbl">Sleep Avg</div></div><div class="sbox"><div class="snum" style="color:var(--fire-c)">${fireC}</div><div class="slbl">Meditation</div></div><div class="sbox"><div class="snum life-color">${fmt(entTotal)}</div><div class="slbl">Ent. Total</div></div></div>
-    <div class="rrow"><span>🎮 Game</span><span class="rval life-color">${fmt(entGame)}</span></div>
+    <div class="rrow"><span>🎮 Play</span><span class="rval life-color">${fmt(entGame)}</span></div>
     <div class="rrow"><span>📺 Show</span><span class="rval life-color">${fmt(entShow)}</span></div>
     <div class="rrow"><span>🌿 Outdoor</span><span class="rval life-color">${fmt(entOut)}</span></div>
     <div class="rrow"><span>Ent. Avg/Day</span><span class="rval life-color">${fmt(Math.round(entTotal/n))}</span></div>
@@ -3536,8 +3536,8 @@ function toggleCmpMetric(m,btn){
 function renderCompare(){
   const days=[];let cur=new Date();
   for(let i=6;i>=0;i--){const d=new Date(cur);d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
-  const metricColor={sleep:'var(--life)',work:'var(--work)',design:'var(--work)',games:'var(--work)',clients:'var(--work)',heavy:'var(--snake)',show:'var(--life)',game:'var(--life)',meditation:'var(--fire-c)'};
-  const metricLabel={sleep:'Sleep',work:'Work Total',design:'Design',games:'Games',clients:'Clients',heavy:'Heavy',show:'Show',game:'Game',meditation:'Meditate'};
+  const metricColor={sleep:'var(--life)',work:'var(--work)',design:'var(--work)',games:'var(--work)',clients:'var(--work)',heavy:'var(--snake)',show:'var(--life)',play:'var(--life)',meditation:'var(--fire-c)'};
+  const metricLabel={sleep:'Sleep',work:'Work Total',design:'Design',games:'Games',clients:'Clients',heavy:'Heavy',show:'Show',play:'Play',meditation:'Meditate'};
   function getVal(k,metric){
     const d=S.daily[k];if(!d)return 0;
     if(metric==='sleep')return(d.sleepHours||0)*60;
@@ -3547,7 +3547,7 @@ function renderCompare(){
     if(metric==='games')return d.games||0;
     if(metric==='clients')return d.clients||0;
     if(metric==='show')return d.entShow||0;
-    if(metric==='game')return d.entGame||0;
+    if(metric==='play')return d.entGame||0;
     if(metric==='meditation')return d.fireDur||0;
     return 0;
   }

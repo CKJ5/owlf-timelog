@@ -1851,6 +1851,12 @@ function saveSleepWake(type){
       const hrs=(wakeMinTotal-sleepMinTotal)/60;
       d.sleepHours=(hrs>0&&hrs<20)?Math.round(hrs*10)/10:null;
     }
+
+    // If yesterday has no sleepTime but today's record has one carry it over
+    if(yDay&&!yDay.sleepTime&&S.daily[tk()]&&S.daily[tk()].sleepTime){
+      yDay.sleepTime=S.daily[tk()].sleepTime;
+    }
+    
     save();closeModal();calcSleepStreak();updateLifeUI();
     // Schedule sleep reminder
     scheduleSleepReminder(t);

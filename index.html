@@ -1691,6 +1691,18 @@ function goTab(idx){
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
   updateTopStreak();
   if(idx===3)renderReport();
+
+  let curPage=0;
+  const tabNames=['work','life','exercise','reports'];
+  let touchX=0,touching=false;
+  const container=()=>document.getElementById('page-container');
+
+  let rMode='daily',rSel=tk();
+  
+  let rCalMonth=mk(); // month shown in daily calendar (YYYY-MM)
+  let rCalYear=yk();  // year shown in monthly/yearly calendar
+
+  
   // Show page swipe flash
   if(idx===3){
     const flash=document.getElementById('page-swipe-flash');
@@ -2512,7 +2524,7 @@ setInterval(()=>{
 },1000);
 
 // ═══ REPORTS ═══
-let rMode='daily',rSel=tk();
+
 // Week starts on: 0=Sun,1=Mon,6=Sat
 function getWeekStart(){return S.weekStart||0;}
 function saveWeekStart(){
@@ -2723,8 +2735,6 @@ function switchReport(mode){
 }
 
 // ── CALENDAR HELPERS ─────────────────────────────────────────────────────────
-let rCalMonth=mk(); // month shown in daily calendar (YYYY-MM)
-let rCalYear=yk();  // year shown in monthly/yearly calendar
 
 function renderReport(){
   // Ratio bar

@@ -86,6 +86,9 @@ async function restoreFromFirestore(){
     const metaDoc=await db.doc(`users/${_uid}/meta/data`).get();
     if(metaDoc.exists){
       const m=metaDoc.data();
+      if(!S.work)S.work={streak:0};
+      if(!S.life)S.life={cleanStreak:0,sleepStreak:0};
+      if(!S.exercise)S.exercise={streak:0};
       if(m.workStreak!==undefined)S.work.streak=m.workStreak;
       if(m.sleepStreak!==undefined)S.life.sleepStreak=m.sleepStreak;
       if(m.exStreak!==undefined)S.exercise.streak=m.exStreak;
@@ -1462,6 +1465,7 @@ function save(){
 
   
 function ensureDay(k){
+  if(!S.daily)S.daily={};
   if(!S.daily[k])S.daily[k]={
     type:'',plan:'',design:0,games:0,clients:0,
     wasted:{design:0,games:0,clients:0},
@@ -1654,6 +1658,7 @@ setInterval(updateActiveNotifications,300000); // every 5 min for system notif
 setInterval(()=>{
   const WTYPES2=['design','games','clients'];
   const acts=[];
+  if(!S.active)return;
   WTYPES2.forEach(t=>{const a=S.active['w_'+t];if(a)acts.push({label:t[0].toUpperCase()+t.slice(1)+(a.proj?' ('+a.proj+')':''),color:'var(--work)',start:a.start});});
   const fa2=S.active['fire'];if(fa2)acts.push({label:'Meditation',color:'var(--fire-c)',start:fa2.start});
   const sa2=S.active['snake'];if(sa2)acts.push({label:'Heavy',color:'var(--snake)',start:sa2.start});

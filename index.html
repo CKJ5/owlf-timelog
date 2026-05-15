@@ -103,9 +103,10 @@ async function restoreFromFirestore(){
     if(!S.daily)S.daily={};
     days.forEach(doc=>{
       const k=doc.id;
-      if(!S.daily)S.daily={};   // ← ADD THIS LINE
+      if(!S.daily)S.daily={};
       if(!S.daily[k])S.daily[k]=doc.data();
       else Object.assign(S.daily[k],doc.data());
+      delete S.daily[k]._ts;
     });
     // Restore sessions
     const sess=await db.collection(`users/${_uid}/sessions`).get();
@@ -1680,23 +1681,13 @@ setInterval(()=>{
 },1000);
 
 // ═══ SWIPE ═══
-  let curPage=0;
-  const tabNames=['work','life','exercise','reports'];
-  let touchX=0,touching=false;
-  const container=()=>document.getElementById('page-container');
-
-  let rMode='daily',rSel=tk();
-  
-  let rCalMonth=mk();
-  let rCalYear=yk();
-
-function goTab(idx){
+  function goTab(idx){
   curPage=idx;
   container().style.transform=`translateX(-${idx*25}%)`;
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
   updateTopStreak();
   if(idx===3)renderReport();
-  
+
   // Show page swipe flash
   if(idx===3){
     const flash=document.getElementById('page-swipe-flash');

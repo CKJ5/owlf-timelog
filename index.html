@@ -100,6 +100,7 @@ async function restoreFromFirestore(){
     }
     // Restore all days
     const days=await db.collection(`users/${_uid}/days`).get();
+    if(!S.daily)S.daily={};
     days.forEach(doc=>{
       const k=doc.id;
       if(!S.daily[k])S.daily[k]=doc.data();
@@ -2393,7 +2394,7 @@ function updateExUI(){
 
   // Strength toggle buttons
   EX_KEYS.forEach(t=>{
-    const a=S.active['ex_'+t];
+    const a=S.active&&S.active['ex_'+t];
     const btn=document.getElementById('ebt-'+t);
     if(btn)btn.className='ent-btn'+(a?' act-life':'');
     const timerEl=document.getElementById('etimer-'+t);

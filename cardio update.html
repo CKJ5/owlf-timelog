@@ -2443,38 +2443,11 @@ function updateExUI(){
   updateTopStreak();
 }
 
-  const d2=getToday();const mo2=mk();
-  const moKeys2=Object.keys(S.daily).filter(k=>k.startsWith(mo2));
-
-  EX_KEYS.forEach(t=>{
-    const a=S.active['ex_'+t];
-    const timerEl=document.getElementById('etimer-'+t);
-    if(timerEl){timerEl.style.display=a?'block':'none';if(a)timerEl.textContent=fmtSec(elSec(a.start));}
-  });
-
-  
-  CARDIO_TYPES.forEach(t=>{
-    const a=S.active['cardio_'+t];
-    const btn=document.getElementById('cbt-'+t);if(btn)btn.className='ent-btn'+(a?' act-life':'');
-    const timerEl=document.getElementById('ctimer-'+t);
-    if(timerEl){timerEl.style.display=a?'block':'none';}
-    const durEl=document.getElementById('cdur-'+t);
-    if(durEl)durEl.textContent=fmt(d2['cardio_'+t]||0);
-  });
-  const cardioTotal=cardioDayTotal(d2);
-  const cardioHdr=document.getElementById('cardio-today-dur');if(cardioHdr)cardioHdr.textContent=fmt(cardioTotal)+' today';
-  const cardioDurEl=document.getElementById('cardio-dur-today');if(cardioDurEl)cardioDurEl.textContent=fmt(cardioTotal);
-  const moCardio=moKeys2.reduce((s,k)=>s+cardioDayTotal(S.daily[k]||{}),0);
-  const cardioDurMo=document.getElementById('cardio-dur-mo');if(cardioDurMo)cardioDurMo.textContent=fmt(moCardio);
-  const cardioAvg=document.getElementById('cardio-avg-mo');if(cardioAvg)cardioAvg.textContent=fmt(moKeys2.length?Math.round(moCardio/moKeys2.length):0);
-  
-  updateTopStreak();{
-}
+ 
 
 // ═══ LIVE TICK ═══
 let _entWarn10Sent=false; // reset each day
 setInterval(()=>{
-  setInterval(()=>{
   if(!S||!S.active)return;   // ← ADD THIS
   WTYPES.forEach(t=>{const a=S.active['w_'+t];
                      if(a)document.getElementById('wtimer-'+t).textContent=fmtSec(elSec(a.start));});

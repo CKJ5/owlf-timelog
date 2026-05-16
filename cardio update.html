@@ -2401,13 +2401,13 @@ function updateExUI(){
   EX_KEYS.forEach(t=>{
     const a=S.active&&S.active['ex_'+t];
     const btn=document.getElementById('ebt-'+t);
-    if(btn)btn.className='ent-btn'+(a?' act-life':'');
+    if(btn)btn.className='prep-btn'+(a?' act-prep':'');
     const timerEl=document.getElementById('etimer-'+t);
     if(timerEl){timerEl.style.display=a?'block':'none';}
     const durEl=document.getElementById('edur-'+t);
     if(durEl)durEl.textContent=d[t]||0;
   });
-
+  
   // Detail breakdown
   const mo=mk();const moKeys=Object.keys(S.daily).filter(k=>k.startsWith(mo));
   const moTotal=moKeys.reduce((s,k)=>s+(S.daily[k].exTotal||0),0);
@@ -2427,7 +2427,7 @@ function updateExUI(){
   const moKeys2=Object.keys(S.daily).filter(k=>k.startsWith(mo2));
   CARDIO_TYPES.forEach(t=>{
     const a=S.active['cardio_'+t];
-    const btn=document.getElementById('cbt-'+t);if(btn)btn.className='ent-btn'+(a?' act-life':'');
+    const btn=document.getElementById('cbt-'+t);if(btn)btn.className='prep-btn'+(a?' act-prep':'');
     const timerEl=document.getElementById('ctimer-'+t);
     if(timerEl){timerEl.style.display=a?'block':'none';}
     const durEl=document.getElementById('cdur-'+t);

@@ -86,6 +86,9 @@ async function restoreFromFirestore(){
     const metaDoc=await db.doc(`users/${_uid}/meta/data`).get();
     if(metaDoc.exists){
       const m=metaDoc.data();
+      if(!S.work)S.work={streak:0};
+      if(!S.life)S.life={cleanStreak:0,sleepStreak:0};
+      if(!S.exercise)S.exercise={streak:0};
       if(m.workStreak!==undefined)S.work.streak=m.workStreak;
       if(m.sleepStreak!==undefined)S.life.sleepStreak=m.sleepStreak;
       if(m.exStreak!==undefined)S.exercise.streak=m.exStreak;
@@ -97,8 +100,10 @@ async function restoreFromFirestore(){
     }
     // Restore all days
     const days=await db.collection(`users/${_uid}/days`).get();
+    if(!S.daily)S.daily={};
     days.forEach(doc=>{
       const k=doc.id;
+      if(!S.daily)S.daily={};   // ← ADD THIS
       if(!S.daily[k])S.daily[k]=doc.data();
       else Object.assign(S.daily[k],doc.data());
       delete S.daily[k]._ts;
@@ -1127,20 +1132,63 @@ function installPWA(){
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-hdr"><span class="card-lbl">Log Times</span><button onclick="resetEx()" style="background:transparent;border:none;color:var(--muted);font-size:11px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700">Reset</button></div>
-    <div class="sr3">
-      <div class="ex-btn" onclick="addEx('abs')"><div class="ex-name">腹肌</div><div class="ex-count" id="exc-abs">0</div><div class="ex-sub" id="exs-abs">—</div></div>
-      <div class="ex-btn" onclick="addEx('bicep')"><div class="ex-name">二头</div><div class="ex-count" id="exc-bicep">0</div><div class="ex-sub" id="exs-bicep">—</div></div>
-      <div class="ex-btn" onclick="addEx('pu')"><div class="ex-name">PushUp</div><div class="ex-count" id="exc-pu">0</div><div class="ex-sub" id="exs-pu">—</div></div>
-      <div class="ex-btn" onclick="addEx('bench')"><div class="ex-name">卧推</div><div class="ex-count" id="exc-bench">0</div><div class="ex-sub" id="exs-bench">—</div></div>
-      <div class="ex-btn" onclick="addEx('jian')"><div class="ex-name">肩</div><div class="ex-count" id="exc-jian">0</div><div class="ex-sub" id="exs-jian">—</div></div>
-      <div class="ex-btn" onclick="addEx('bei')"><div class="ex-name">背</div><div class="ex-count" id="exc-bei">0</div><div class="ex-sub" id="exs-bei">—</div></div>
+  <div class="card" id="ex-log-card">
+    <div class="card-hdr card-hdr-btn" onclick="toggleCardCollapse('ex-log-body','ex-log-arrow','ex-log-lbl')">
+      <span class="card-lbl" id="ex-log-lbl" style="color:var(--ex)">Strength</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button onclick="event.stopPropagation();resetEx()" style="background:transparent;border:none;color:var(--muted);font-size:11px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700">Reset</button>
+        <span id="ex-log-arrow" style="font-size:12px;color:var(--muted)">▾</span>
+      </div>
     </div>
-
-    
- </div>
-    
+    <div class="card-collapse-body" id="ex-log-body" style="max-height:0px">
+      <div class="ent-row" style="margin-top:8px">
+        <button class="ent-btn" id="ebt-abs" onclick="toggleEx('abs')">
+          <div>腹肌</div>
+          <div class="ent-timer" id="etimer-abs" style="display:none">—</div>
+          <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace" id="edur-abs">0</div>
+        </button>
+        <button class="ent-btn" id="ebt-bicep" onclick="toggleEx('bicep')">
+          <div>二头</div>
+          <div class="ent-timer" id="etimer-bicep" style="display:none">—</div>
+          <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace" id="edur-bicep">0</div>
+        </button>
+        <button class="ent-btn" id="ebt-pu" onclick="toggleEx('pu')">
+          <div>PU</div>
+          <div class="ent-timer" id="etimer-pu" style="display:none">—</div>
+          <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace" id="edur-pu">0</div>
+        </button>
+      </div>
+      <div class="ent-row">
+        <button class="ent-btn" id="ebt-bench" onclick="toggleEx('bench')">
+          <div>卧推</div>
+          <div class="ent-timer" id="etimer-bench" style="display:none">—</div>
+          <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace" id="edur-bench">0</div>
+        </button>
+        <button class="ent-btn" id="ebt-jian" onclick="toggleEx('jian')">
+          <div>肩</div>
+          <div class="ent-timer" id="etimer-jian" style="display:none">—</div>
+          <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace" id="edur-jian">0</div>
+        </button>
+        <button class="ent-btn" id="ebt-bei" onclick="toggleEx('bei')">
+          <div>背</div>
+          <div class="ent-timer" id="etimer-bei" style="display:none">—</div>
+          <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace" id="edur-bei">0</div>
+        </button>
+      </div>
+      <div class="card-collapse-body" id="ex-detail-body" style="max-height:0px;margin-top:4px">
+        <div class="sr3" style="margin-top:8px">
+          <div class="sbox"><div class="snum" style="color:var(--ex)" id="ex-detail-total">0</div><div class="slbl">Total Today</div></div>
+          <div class="sbox"><div class="snum" style="color:var(--ex)" id="ex-detail-mo">0</div><div class="slbl">Mo. Total</div></div>
+          <div class="sbox"><div class="snum" style="color:var(--ex)" id="ex-detail-avg">0</div><div class="slbl">Mo. Avg</div></div>
+        </div>
+        <div id="ex-detail-breakdown" style="margin-top:4px"></div>
+      </div>
+      <div onclick="toggleCardCollapse('ex-detail-body','ex-detail-arrow',null)" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;cursor:pointer;user-select:none;border-top:1px solid var(--border);margin-top:8px">
+        <span style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Details</span>
+        <span style="font-size:11px;color:var(--muted)" id="ex-detail-arrow">▾</span>
+      </div>
+    </div>
+</div>    
  
 
 <div class="card">
@@ -1169,10 +1217,8 @@ function installPWA(){
   </div>
 </div>
 
-  
+
 </div>
-
-
 
 <!-- ════ REPORTS PAGE ════ -->
 <div class="page" id="page-reports" style="padding-top:12px;align-self:flex-start">
@@ -1214,7 +1260,7 @@ function installPWA(){
     <span id="report-show-btn-lbl">📋 Show Report</span>
     <span style="color:var(--muted);font-size:13px">▾</span>
   </button>
-  <div class="ver-tag">OWLF Time Log ver-2026 May 08 - A</div>
+  <div class="ver-tag">OWLF Time Log ver-2026 May 16 - A</div>
 </div>
 
 </div><!-- end page-container -->
@@ -1419,6 +1465,7 @@ function save(){
 
   
 function ensureDay(k){
+  if(!S.daily)S.daily={};
   if(!S.daily[k])S.daily[k]={
     type:'',plan:'',design:0,games:0,clients:0,
     wasted:{design:0,games:0,clients:0},
@@ -1590,6 +1637,7 @@ function updateActiveNotifications(){
   const sa=S.active['snake'];if(sa)active.push({label:'🐍 Snake',color:'var(--snake)',start:sa.start});
   ['play','show','outdoor'].forEach(t=>{const a=S.active['ent_'+t];if(a){const ico=t==='play'?'🎮':t==='show'?'📺':'🌿';active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
   ['cook','meal','transport','sport','shower','other'].forEach(t=>{const a=S.active['prep_'+t];if(a){const ico={cook:'🍳',meal:'🍱',transport:'🚗',sport:'⚽',shower:'🚿',other:'📦'}[t];active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
+  EX_KEYS.forEach(t=>{const a=S.active['ex_'+t];if(a){active.push({label:EX_LABELS[t],color:'var(--ex)',start:a.start});}});
   CARDIO_TYPES.forEach(t=>{const a=S.active['cardio_'+t];if(a){const ico={jogging:'🏃',cycling:'🚴',hiit:'🔥'}[t];active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
   
   // Update in-app banner
@@ -1610,11 +1658,15 @@ setInterval(updateActiveNotifications,300000); // every 5 min for system notif
 setInterval(()=>{
   const WTYPES2=['design','games','clients'];
   const acts=[];
+  if(!S.active)return;
   WTYPES2.forEach(t=>{const a=S.active['w_'+t];if(a)acts.push({label:t[0].toUpperCase()+t.slice(1)+(a.proj?' ('+a.proj+')':''),color:'var(--work)',start:a.start});});
   const fa2=S.active['fire'];if(fa2)acts.push({label:'Meditation',color:'var(--fire-c)',start:fa2.start});
   const sa2=S.active['snake'];if(sa2)acts.push({label:'Heavy',color:'var(--snake)',start:sa2.start});
   ['play','show','outdoor'].forEach(t=>{const a=S.active['ent_'+t];if(a){const ico=t==='play'?'🎮':t==='show'?'📺':'🌿';acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
   ['cook','meal','transport','sport','shower','other'].forEach(t=>{const a=S.active['prep_'+t];if(a){const ico={cook:'🍳',meal:'🍱',transport:'🚗',sport:'⚽',shower:'🚿',other:'📦'}[t];acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
+  
+  EX_KEYS.forEach(t=>{const a=S.active['ex_'+t];if(a){acts.push({label:EX_LABELS[t],color:'var(--ex)',start:a.start});}});
+  
   CARDIO_TYPES.forEach(t=>{const a=S.active['cardio_'+t];if(a){const ico={jogging:'🏃',cycling:'🚴',hiit:'🔥'}[t];acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
   const banner=document.getElementById('active-banner');
   const itemsEl=document.getElementById('active-banner-items');
@@ -1633,6 +1685,10 @@ let curPage=0;
 const tabNames=['work','life','exercise','reports'];
 let touchX=0,touching=false;
 const container=()=>document.getElementById('page-container');
+
+let rMode='daily',rSel=tk();
+let rCalMonth=mk(); // month shown in daily calendar (YYYY-MM)
+let rCalYear=yk();  // year shown in monthly/yearly calendar
 
 function goTab(idx){
   curPage=idx;
@@ -2030,20 +2086,45 @@ function togglePrep(type){
 }
 const EX_LABELS={abs:'腹肌',bicep:'二头',pu:'PushUp',bench:'卧推',jian:'肩',bei:'背'};
 const EX_KEYS=Object.keys(EX_LABELS);
-function addEx(type){
-  showModal(`<h3 style="color:var(--ex)">${EX_LABELS[type]}</h3><label class="mlbl">Times (sets e.g. 15+15)</label><input type="text" id="ex-inp" placeholder="e.g. 20 or 15+15" style="border-color:var(--ex)" autofocus><div class="mbtns" style="margin-top:6px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf bex" onclick="saveEx('${type}')">Add</button></div>`,null);
-  setTimeout(()=>document.getElementById('ex-inp')?.focus(),80);
+
+function toggleEx(type){
+  const a=S.active['ex_'+type];
+  if(a){
+    const el=Math.round(elMin(a.start));
+    showModal(`<h3 style="color:var(--ex)">${EX_LABELS[type]}</h3><p style="color:var(--muted);font-size:13px;margin-bottom:10px">Time: ${fmtSec(elSec(a.start))}</p><label class="mlbl">Times (sets e.g. 15+15)</label><input type="text" id="ex-inp" placeholder="e.g. 20 or 15+15" style="border-color:var(--ex)" autofocus><div class="mbtns" style="margin-top:6px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf bex" onclick="saveExToggle('${type}',${a.start})">Done</button></div>`,null);
+    setTimeout(()=>document.getElementById('ex-inp')?.focus(),80);
+  } else {
+    S.active['ex_'+type]={start:nowTs()};save();updateExUI();
+  }
 }
-function saveEx(type){
-  const val=(document.getElementById('ex-inp')?.value||'').trim();if(!val){closeModal();return;}
+function saveExToggle(type,startTs){
+  const val=(document.getElementById('ex-inp')?.value||'').trim();
+  if(!val){
+    // cancelled — still stop timer
+    delete S.active['ex_'+type];save();closeModal();updateExUI();return;
+  }
   const sets=val.split('+').map(v=>parseInt(v)||0).filter(v=>v>0);
   const total=sets.reduce((a,b)=>a+b,0);
-  const d=getToday();d[type]=(d[type]||0)+total;d[type+'Sets']=[...(d[type+'Sets']||[]),...sets];d.exTotal=(d.exTotal||0)+total;
+  const dur=Math.round(elMin(startTs));
+  const d=getToday();
+  d[type]=(d[type]||0)+total;
+  d[type+'Sets']=[...(d[type+'Sets']||[]),...sets];
+  d.exTotal=(d.exTotal||0)+total;
+  if(!d[type+'Log'])d[type+'Log']=[];
+  d[type+'Log'].push({sets,total,dur,end:nowTs()});
+  delete S.active['ex_'+type];
   save();closeModal();checkExTarget();updateExUI();
 }
-function resetEx(){if(!confirm('Reset today exercise?'))return;const d=getToday();EX_KEYS.forEach(t=>{d[t]=0;d[t+'Sets']=[];});d.exTotal=0;d.exHit=false;save();updateExUI();}
+function resetEx(){
+  if(!confirm('Reset today exercise?'))return;
+  const d=getToday();
+  EX_KEYS.forEach(t=>{d[t]=0;d[t+'Sets']=[];d[t+'Log']=[];delete S.active['ex_'+t];});
+  d.exTotal=0;d.exHit=false;
+  save();updateExUI();
+}
 function showExTarget(){showModal(`<h3 style="color:var(--ex)">Daily Target</h3><label class="mlbl">Times per day</label><input type="number" id="ext-inp" value="${S.exTarget||10}" min="1" style="border-color:var(--ex)"><div class="mbtns" style="margin-top:6px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf bex" onclick="saveExTarget()">Save</button></div>`,null);}
 function saveExTarget(){const v=parseInt(document.getElementById('ext-inp')?.value)||10;S.exTarget=v;save();closeModal();checkExTarget();updateExUI();}
+
 function checkExTarget(){
   const d=getToday();if((d.exTotal||0)>=S.exTarget&&!d.exHit){
     d.exHit=true;let s=0;let cur=new Date();
@@ -2315,16 +2396,38 @@ function updateExUI(){
   document.getElementById('ex-prog-txt').textContent=total+' / '+tgt;
   document.getElementById('ex-hit-lbl').textContent=d.exHit?'✓ Hit!':'';
   document.getElementById('ex-streak-inline').textContent=(S.exercise&&S.exercise.streak)||0;
-  EX_KEYS.forEach(t=>{
-    document.getElementById('exc-'+t).textContent=d[t]||0;
-    document.getElementById('exs-'+t).textContent=(d[t+'Sets']||[]).length?(d[t+'Sets']).join('+'):'—';
-  });
 
+  // Strength toggle buttons
+  EX_KEYS.forEach(t=>{
+    const a=S.active&&S.active['ex_'+t];
+    const btn=document.getElementById('ebt-'+t);
+    if(btn)btn.className='prep-btn'+(a?' act-prep':'');
+    const timerEl=document.getElementById('etimer-'+t);
+    if(timerEl){timerEl.style.display=a?'block':'none';}
+    const durEl=document.getElementById('edur-'+t);
+    if(durEl)durEl.textContent=d[t]||0;
+  });
+  
+  // Detail breakdown
+  const mo=mk();const moKeys=Object.keys(S.daily).filter(k=>k.startsWith(mo));
+  const moTotal=moKeys.reduce((s,k)=>s+(S.daily[k].exTotal||0),0);
+  const exDetTotal=document.getElementById('ex-detail-total');if(exDetTotal)exDetTotal.textContent=total;
+  const exDetMo=document.getElementById('ex-detail-mo');if(exDetMo)exDetMo.textContent=moTotal;
+  const exDetAvg=document.getElementById('ex-detail-avg');if(exDetAvg)exDetAvg.textContent=moKeys.length?Math.round(moTotal/moKeys.length):0;
+  const breakdown=document.getElementById('ex-detail-breakdown');
+  if(breakdown){
+    breakdown.innerHTML=EX_KEYS.map(t=>{
+      const v=d[t]||0;const sets=d[t+'Sets']||[];
+      return v?`<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:12px"><span style="color:var(--muted)">${EX_LABELS[t]}</span><span style="font-family:'Space Mono',monospace;color:var(--ex)">${v}${sets.length?' ('+sets.join('+')+')'  :''}</span></div>`:'';
+    }).join('');
+  }
+
+  // Cardio
   const d2=getToday();const mo2=mk();
   const moKeys2=Object.keys(S.daily).filter(k=>k.startsWith(mo2));
   CARDIO_TYPES.forEach(t=>{
     const a=S.active['cardio_'+t];
-    const btn=document.getElementById('cbt-'+t);if(btn)btn.className='ent-btn'+(a?' act-life':'');
+    const btn=document.getElementById('cbt-'+t);if(btn)btn.className='prep-btn'+(a?' act-prep':'');
     const timerEl=document.getElementById('ctimer-'+t);
     if(timerEl){timerEl.style.display=a?'block':'none';}
     const durEl=document.getElementById('cdur-'+t);
@@ -2336,14 +2439,18 @@ function updateExUI(){
   const moCardio=moKeys2.reduce((s,k)=>s+cardioDayTotal(S.daily[k]||{}),0);
   const cardioDurMo=document.getElementById('cardio-dur-mo');if(cardioDurMo)cardioDurMo.textContent=fmt(moCardio);
   const cardioAvg=document.getElementById('cardio-avg-mo');if(cardioAvg)cardioAvg.textContent=fmt(moKeys2.length?Math.round(moCardio/moKeys2.length):0);
-  
+
   updateTopStreak();
 }
+
+ 
 
 // ═══ LIVE TICK ═══
 let _entWarn10Sent=false; // reset each day
 setInterval(()=>{
-  WTYPES.forEach(t=>{const a=S.active['w_'+t];if(a)document.getElementById('wtimer-'+t).textContent=fmtSec(elSec(a.start));});
+  if(!S||!S.active)return;   // ← ADD THIS
+  WTYPES.forEach(t=>{const a=S.active['w_'+t];
+                     if(a)document.getElementById('wtimer-'+t).textContent=fmtSec(elSec(a.start));});
   const fa=S.active['fire'];if(fa)document.getElementById('timer-fire').textContent=fmtSec(elSec(fa.start));
   const sa=S.active['snake'];if(sa)document.getElementById('timer-snake').textContent=fmtSec(elSec(sa.start));
   ENT_TYPES.forEach(t=>{
@@ -2386,7 +2493,7 @@ setInterval(()=>{
 },1000);
 
 // ═══ REPORTS ═══
-let rMode='daily',rSel=tk();
+
 // Week starts on: 0=Sun,1=Mon,6=Sat
 function getWeekStart(){return S.weekStart||0;}
 function saveWeekStart(){
@@ -2597,8 +2704,6 @@ function switchReport(mode){
 }
 
 // ── CALENDAR HELPERS ─────────────────────────────────────────────────────────
-let rCalMonth=mk(); // month shown in daily calendar (YYYY-MM)
-let rCalYear=yk();  // year shown in monthly/yearly calendar
 
 function renderReport(){
   // Ratio bar
@@ -3108,6 +3213,31 @@ function buildTimeline(dateKey){
     const endM=endMs?tsToMytMin(endMs):(wakeMin||420)+dur;
     events.push({label:'🐍 Heavy',color:'#9b59b6',start:endM-dur,end:endM,cat:'snake'});
   });
+
+  // Strength exercise sessions
+  EX_KEYS.forEach(t=>{
+    const log=d[t+'Log']||[];
+    const color={abs:'#dfb67e',bicep:'#27ae60',pu:'#2980b9',bench:'#8e44ad',jian:'#e67e22',bei:'#c0392b'}[t]||'var(--ex)';
+    log.forEach(entry=>{
+      const dur=typeof entry==='object'?entry.dur:0;
+      const endMs=typeof entry==='object'?entry.end:null;
+      const endM=endMs?tsToMytMin(endMs):wakeMin+dur;
+      if(dur>0)events.push({label:EX_LABELS[t]+' '+(entry.total||'')+'×',color,start:endM-dur,end:endM,cat:'ex'});
+    });
+  });
+  // Cardio sessions
+  CARDIO_TYPES.forEach(t=>{
+    const log=d['cardio_'+t+'Log']||[];
+    const ico={jogging:'🏃',cycling:'🚴',hiit:'🔥'}[t];
+    log.forEach(entry=>{
+      const dur=typeof entry==='object'?entry.dur:entry;
+      const endMs=typeof entry==='object'?entry.end:null;
+      const endM=endMs?tsToMytMin(endMs):wakeMin+dur;
+      events.push({label:ico+' '+t,color:'var(--ex)',start:endM-dur,end:endM,cat:'ex'});
+    });
+  });
+
+  
   (d.fireLog||[]).forEach(entry=>{
     const dur=typeof entry==='object'?entry.dur:entry;
     const endMs=typeof entry==='object'?entry.end:null;
@@ -3228,6 +3358,30 @@ function rebuildGridRows(uid,dateKey,startMin,totalMin,isFull){
     const endM=endMs?tsToMytMin(endMs):wakeMin+dur;
     events.push({label:'🐍 Heavy',color:'#9b59b6',start:endM-dur,end:endM,cat:'snake'});
   });
+
+  // Strength exercise sessions
+  EX_KEYS.forEach(t=>{
+    const log=d[t+'Log']||[];
+    const color={abs:'#dfb67e',bicep:'#27ae60',pu:'#2980b9',bench:'#8e44ad',jian:'#e67e22',bei:'#c0392b'}[t]||'var(--ex)';
+    log.forEach(entry=>{
+      const dur=typeof entry==='object'?entry.dur:0;
+      const endMs=typeof entry==='object'?entry.end:null;
+      const endM=endMs?tsToMytMin(endMs):wakeMin+dur;
+      if(dur>0)events.push({label:EX_LABELS[t]+' '+(entry.total||'')+'×',color,start:endM-dur,end:endM,cat:'ex'});
+    });
+  });
+  // Cardio sessions
+  CARDIO_TYPES.forEach(t=>{
+    const log=d['cardio_'+t+'Log']||[];
+    const ico={jogging:'🏃',cycling:'🚴',hiit:'🔥'}[t];
+    log.forEach(entry=>{
+      const dur=typeof entry==='object'?entry.dur:entry;
+      const endMs=typeof entry==='object'?entry.end:null;
+      const endM=endMs?tsToMytMin(endMs):wakeMin+dur;
+      events.push({label:ico+' '+t,color:'var(--ex)',start:endM-dur,end:endM,cat:'ex'});
+    });
+  });
+  
   (d.fireLog||[]).forEach(entry=>{
     const dur=typeof entry==='object'?entry.dur:entry;
     const endMs=typeof entry==='object'?entry.end:null;
@@ -4349,6 +4503,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('page-container').style.width=(4*100)+'%';
   document.querySelectorAll('.page').forEach(p=>p.style.width='25%');
 });
+  
 </script>
 
 </body>

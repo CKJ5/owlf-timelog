@@ -907,7 +907,7 @@ function installPWA(){
   </div>
 
   <div class="card" id="snake-card">
-  <div class="card-hdr card-hdr-btn" onclick="toggleCardCollapse('snake-body','snake-collapse-arrow','snake-hdr-lbl')">
+  <div class="card-hdr card-hdr-btn" onclick="('snake-body','snake-collapse-arrow','snake-hdr-lbl')">
     <span class="card-lbl" id="snake-hdr-lbl" style="color:var(--snake)">Heavy</span>
     <div style="display:flex;align-items:center;gap:8px">
       <span id="snake-collapse-arrow" style="font-size:12px;color:var(--muted)">▾</span>
@@ -1025,7 +1025,7 @@ function installPWA(){
   </div>
 
   <div class="card" id="ent-card">
-    <div class="card-hdr card-hdr-btn" onclick="toggleCardCollapse('ent-body','ent-collapse-arrow','ent-hdr-lbl')">
+    <div class="card-hdr card-hdr-btn" onclick="('ent-body','ent-collapse-arrow','ent-hdr-lbl')">
       <span class="card-lbl" id="ent-hdr-lbl">Entertainment</span>
       <div style="display:flex;align-items:center;gap:8px">
         <span id="ent-over-badge" style="display:none;font-size:10px;font-weight:700;color:#ff00aa">OVER LIMIT</span>
@@ -1083,7 +1083,7 @@ function installPWA(){
   </div>
 
   <div class="card" id="med-card">
-    <div class="card-hdr card-hdr-btn" onclick="toggleCardCollapse('med-body','med-collapse-arrow','med-hdr-lbl')">
+    <div class="card-hdr card-hdr-btn" onclick="('med-body','med-collapse-arrow','med-hdr-lbl')">
       <span class="card-lbl" id="med-hdr-lbl">Meditation</span>
       <span id="med-collapse-arrow" style="color:var(--muted)">▾</span>
     </div>
@@ -1133,7 +1133,7 @@ function installPWA(){
   </div>
 
   <div class="card" id="ex-log-card">
-    <div class="card-hdr card-hdr-btn" onclick="toggleCardCollapse('ex-log-body','ex-log-arrow','ex-log-lbl')">
+    <div class="card-hdr card-hdr-btn" onclick="('ex-log-body','ex-log-arrow','ex-log-lbl')">
       <span class="card-lbl" id="ex-log-lbl" style="color:var(--ex)">Strength</span>
       <div style="display:flex;align-items:center;gap:8px">
         <button onclick="event.stopPropagation();resetEx()" style="background:transparent;border:none;color:var(--muted);font-size:11px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700">Reset</button>
@@ -1175,7 +1175,7 @@ function installPWA(){
           <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace" id="edur-bei">0</div>
         </button>
       </div>
-      <div class="card-collapse-body" id="ex-detail-body" style="max-height:0px;margin-top:4px">
+      <div id="ex-detail-body" style="margin-top:4px">
         <div class="sr3" style="margin-top:8px">
           <div class="sbox"><div class="snum" style="color:var(--ex)" id="ex-detail-total">0</div><div class="slbl">Total Today</div></div>
           <div class="sbox"><div class="snum" style="color:var(--ex)" id="ex-detail-mo">0</div><div class="slbl">Mo. Total</div></div>
@@ -1183,10 +1183,7 @@ function installPWA(){
         </div>
         <div id="ex-detail-breakdown" style="margin-top:4px"></div>
       </div>
-      <div onclick="toggleCardCollapse('ex-detail-body','ex-detail-arrow',null)" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;cursor:pointer;user-select:none;border-top:1px solid var(--border);margin-top:8px">
-        <span style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Details</span>
-        <span style="font-size:11px;color:var(--muted)" id="ex-detail-arrow">▾</span>
-      </div>
+      
     </div>
 </div>    
  

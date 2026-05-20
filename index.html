@@ -108,15 +108,34 @@ async function restoreFromFirestore(){
       else Object.assign(S.daily[k],doc.data());
       delete S.daily[k]._ts;
     });
+    
     // Restore sessions
     const sess=await db.collection(`users/${_uid}/sessions`).get();
     sess.forEach(doc=>{
       const k=doc.id;
       if(!S.sessions[k]&&doc.data().list)S.sessions[k]=doc.data().list;
     });
+    // Recalculate sleepHours for any day that has wakeTime but missing sleepHours
+    Object.keys(S.daily).forEach(k=>{
+      const d=S.daily[k];
+      if(!d||d.sleepHours)return; // already has it
+      if(!d.wakeTime)return;      // can't calculate without wake time
+      // Get the previous day's sleepTime
+      const [y,mo,dy]=k.split('-').map(Number);
+      const prev=new Date(Date.UTC(y,mo-1,dy-1)).toISOString().slice(0,10);
+      const prevDay=S.daily[prev];
+      if(!prevDay||!prevDay.sleepTime)return;
+      const{h:sh,m:sm}=parseHM(prevDay.sleepTime);
+      const{h:wh,m:wm}=parseHM(d.wakeTime);
+      let sleepMin=sh*60+sm,wakeMin=wh*60+wm;
+      if(wakeMin<=sleepMin)wakeMin+=1440;
+      const hrs=(wakeMin-sleepMin)/60;
+      if(hrs>0&&hrs<20)d.sleepHours=Math.round(hrs*10)/10;
+    });
     save();
     updateWorkUI();updateLifeUI();updateExUI();renderReport();
     console.log('Firestore restore done');
+    
   }catch(e){console.warn('Firestore restore failed:',e);}
 }
 </script>
@@ -4491,7 +4510,25 @@ function removeProjectType(idx){
 
 // ═══ INIT ═══
 // Load data immediately (needed by timers)
-loadS();ensureDay(tk());save();
+loadS();ensureDay(tk());
+// Recalculate any missing sleepHours
+Object.keys(S.daily).forEach(k=>{
+  const d=S.daily[k];
+  if(!d||d.sleepHours)return;
+  if(!d.wakeTime)return;
+  const[y,mo,dy]=k.split('-').map(Number);
+  const prev=new Date(Date.UTC(y,mo-1,dy-1)).toISOString().slice(0,10);
+  const prevDay=S.daily[prev];
+  if(!prevDay||!prevDay.sleepTime)return;
+  const{h:sh,m:sm}=parseHM(prevDay.sleepTime);
+  const{h:wh,m:wm}=parseHM(d.wakeTime);
+  let sleepMin=sh*60+sm,wakeMin=wh*60+wm;
+  if(wakeMin<=sleepMin)wakeMin+=1440;
+  const hrs=(wakeMin-sleepMin)/60;
+  if(hrs>0&&hrs<20)d.sleepHours=Math.round(hrs*10)/10;
+});
+save();
+  
 // Defer DOM-dependent UI to DOMContentLoaded
 document.addEventListener('DOMContentLoaded',()=>{
   requestNotifPerm().then(updateNotifBtnUI);

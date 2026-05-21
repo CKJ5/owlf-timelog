@@ -1952,16 +1952,15 @@ function saveYesterdaySleep(){
   const yKey=yd();
   ensureDay(yKey);
   S.daily[yKey].sleepTime=t;
-  // If today has a wake time, recalculate sleep hours
   const todayD=getToday();
-  if(todayD.wakeTime){
-    const{h:sh,m:sm}=parseHM(t);
-    const{h:wh,m:wm}=parseHM(todayD.wakeTime);
-    let sleepMinTotal=toMin(sh,sm),wakeMinTotal=toMin(wh,wm);
-    if(wakeMinTotal<=sleepMinTotal)wakeMinTotal+=1440;
-    const hrs=(wakeMinTotal-sleepMinTotal)/60;
-    todayD.sleepHours=(hrs>0&&hrs<20)?Math.round(hrs*10)/10:null;
-  }
+  // Use today's wake time if set, otherwise use current time as fallback
+  const wakeStr=todayD.wakeTime||(pad(myDate().getUTCHours())+':'+pad(myDate().getUTCMinutes()));
+  const{h:sh,m:sm}=parseHM(t);
+  const{h:wh,m:wm}=parseHM(wakeStr);
+  let sleepMinTotal=toMin(sh,sm),wakeMinTotal=toMin(wh,wm);
+  if(wakeMinTotal<=sleepMinTotal)wakeMinTotal+=1440;
+  const hrs=(wakeMinTotal-sleepMinTotal)/60;
+  if(hrs>0&&hrs<20)todayD.sleepHours=Math.round(hrs*10)/10;
   save();closeModal();calcSleepStreak();updateLifeUI();
 }
 

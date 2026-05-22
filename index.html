@@ -132,6 +132,19 @@ async function restoreFromFirestore(){
       const hrs=(wakeMin-sleepMin)/60;
       if(hrs>0&&hrs<20)d.sleepHours=Math.round(hrs*10)/10;
     });
+    // Reconcile sessions vs daily totals for all days
+    Object.keys(S.sessions).forEach(k=>{
+      const d=S.daily[k];if(!d)return;
+      const sess=S.sessions[k]||[];
+      if(!sess.length)return;
+      const recalc={design:0,games:0,clients:0};
+      sess.forEach(s=>{if(recalc[s.type]!==undefined)recalc[s.type]+=s.dur||0;});
+      const storedTotal=(d.design||0)+(d.games||0)+(d.clients||0);
+      const calcTotal=recalc.design+recalc.games+recalc.clients;
+      if(storedTotal===0&&calcTotal>0){
+        d.design=recalc.design;d.games=recalc.games;d.clients=recalc.clients;
+      }
+    });
     save();
     updateWorkUI();updateLifeUI();updateExUI();renderReport();
     console.log('Firestore restore done');
@@ -2209,8 +2222,17 @@ function importData(e){
 // ═══ UI UPDATES ═══
 function updateWorkUI(){
   const d=getToday();
+  // Reconcile: if daily totals are 0 but sessions exist, recalculate from sessions
+  const todaySessions=S.sessions[tk()]||[];
+  if(todaySessions.length){
+    const recalc={design:0,games:0,clients:0};
+    todaySessions.forEach(s=>{if(recalc[s.type]!==undefined)recalc[s.type]+=s.dur||0;});
+    if((d.design||0)+(d.games||0)+(d.clients||0)===0){
+      d.design=recalc.design;d.games=recalc.games;d.clients=recalc.clients;
+      save();
+    }
+  }
   document.getElementById('dt-type').textContent=d.type||'—';
-  document.getElementById('dt-plan').textContent=d.plan||'—';
   const wt=(d.design||0)+(d.games||0)+(d.clients||0);
   document.getElementById('work-pbar').style.width=Math.min(100,(wt/S.workMin)*100)+'%';
   document.getElementById('work-today-txt').textContent=fmt(wt)+' today';

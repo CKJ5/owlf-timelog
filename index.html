@@ -64,10 +64,15 @@ async function syncToFirestore(){
   if(!_uid)return;
   try{
     const today=tk();
+    const yesterday=yd();
     const dayData=S.daily[today]||{};
+    
     const meta={workStreak:S.work.streak||0,sleepStreak:S.life.sleepStreak||0,exStreak:S.exercise.streak||0,workMin:S.workMin||180,sleepTarget:S.sleepTarget||7,exTarget:S.exTarget||100,medalTarget:S.medalTarget||25,projectTypes:S.projectTypes||[],uiStyle:S.uiStyle||'owlf',weekStart:S.weekStart||0,ratioSelections:S.ratioSelections||{},recentSessions:S.recentSessions||[]};
     const batch=db.batch();
     batch.set(db.doc(`users/${_uid}/days/${today}`),{...dayData,_ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    // Also sync yesterday in case heavy/sleep sessions crossed midnight
+    const ydayData=S.daily[yesterday];
+    if(ydayData)batch.set(db.doc(`users/${_uid}/days/${yesterday}`),{...ydayData,_ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
     // Also sync today's sessions
     const sess=S.sessions[today]||[];
     if(sess.length)batch.set(db.doc(`users/${_uid}/sessions/${today}`),{list:sess},{merge:true});
@@ -1457,7 +1462,8 @@ function loadS(){
   const EMPTY=['entGameNames','entShowNames','entOutdoorNames','entCleanNames','entLaydownNames','entDateNames',
     'entGameLog','entShowLog','entOutdoorLog','entCleanLog','entLaydownLog','entDateLog',
     'absSets','bicepSets','puSets','benchSets','jianSets','beiSets',
-    'prepCookLog','prepMealLog','prepTransportLog','prepSportLog','prepShowerLog','prepOtherLog'];
+    'prepCookLog','prepMealLog','prepTransportLog','prepSportLog','prepShowerLog','prepOtherLog',
+    'snakeLog','fireLog','cardio_joggingLog','cardio_cyclingLog','cardio_hiitLog'];
   Object.keys(d).forEach(k=>{
     const v=d[k];
     if(ZERO.includes(k)&&!v)return;
@@ -1990,7 +1996,9 @@ function saveNap(){
   const d=getToday();
   d.napCount=(d.napCount||0)+1;
   d.napDur=(d.napDur||0)+dur;
-  save();closeModal();updateLifeUI();
+  // Add nap to today's total sleep hours
+  d.sleepHours=Math.round(((d.sleepHours||0)+dur/60)*10)/10;
+  save();closeModal();calcSleepStreak();updateLifeUI();
 }
 
 function scheduleSleepReminder(wakeTimeStr){
@@ -2248,6 +2256,8 @@ function updateWorkUI(){
   // snake
   const sa=S.active['snake'];
   document.getElementById('btn-snake').className='toggle-btn'+(sa?' act-snake':'');
+  if(!sa)document.getElementById('timer-snake').textContent=d.snakeDur?fmt(d.snakeDur):'—';
+  
   document.getElementById('snake-ct-today').textContent=d.snakeSessions||0;
   document.getElementById('snake-dur-today').textContent=fmt(d.snakeDur||0);
   document.getElementById('snake-sub').textContent=(d.snakeSessions||0)+' times today';
@@ -3175,6 +3185,7 @@ function buildDailyCompact(dateKey){
     compactSec('🌙 Life','var(--life)',[
       ['Wake',d.wakeTime||'—','var(--life)'],
       ['Sleep',d.sleepHours?fmtH(d.sleepHours):'—','var(--life)'],
+      ['Nap',(d.napCount||0)>0?((d.napCount)+'× '+fmt(d.napDur||0)):'—'],
       ['Entertainment',fmt(entT),'var(--life)'],
       ['🎮 Play',fmtLog(d.entGameLog)],
       ['📺 Show',fmtLog(d.entShowLog)],

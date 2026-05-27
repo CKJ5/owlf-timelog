@@ -2039,11 +2039,13 @@ function toggleEnt(type){
   if(a){
     const el=Math.round(elMin(a.start));
     const d=getToday();
-    const cap=type[0].toUpperCase()+type.slice(1);
+    const keyMap={play:'Game',show:'Show',outdoor:'Outdoor',clean:'Clean',laydown:'Laydown',date:'Date'};
+    const cap=keyMap[type]||type[0].toUpperCase()+type.slice(1);
     d['ent'+cap]=(d['ent'+cap]||0)+el;
     d['ent'+cap+'Sessions']=(d['ent'+cap+'Sessions']||0)+1;
     if(!d['ent'+cap+'Log'])d['ent'+cap+'Log']=[];
     if(el>0)d['ent'+cap+'Log'].push({dur:el,end:nowTs()});
+    
     delete S.active['ent_'+type];save();updateLifeUI();
   } else {
     const icons={play:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'};
@@ -2361,14 +2363,17 @@ function updateLifeUI(){
   document.getElementById('ent-pbar').style.width=Math.min(100,(entTotal/120)*100)+'%';
   document.getElementById('ent-pbar').style.background=isOver?'#ff00aa':'var(--life)';
   document.getElementById('ent-over-badge').style.display=isOver?'block':'none';
+  
+  const entKeyMap={play:'Play',show:'Show',outdoor:'Outdoor',clean:'Clean',laydown:'Laydown',date:'Date'};
   ENT_TYPES.forEach(type=>{
     const a=S.active['ent_'+type];
     const btn=document.getElementById('ebt-'+type);
     btn.className='ent-btn'+(a?' act-life':(isOver?' magenta':''));
-    const cap=type[0].toUpperCase()+type.slice(1);
+    const cap=entKeyMap[type]||type[0].toUpperCase()+type.slice(1);
     const durEl=document.getElementById('edur-'+type);
     if(durEl){const v=d['ent'+cap]||0;durEl.textContent=v?fmt(v):'0m';durEl.style.color=a?'var(--life)':'var(--muted)';}
   });
+  
   // Highlight ent header if any ent active
   const anyEntActive=ENT_TYPES.some(t=>S.active['ent_'+t]);
   const entHdrLbl=document.getElementById('ent-hdr-lbl');

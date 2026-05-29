@@ -3258,7 +3258,7 @@ function buildTimeline(dateKey){
   const sleepMin=d.sleepTime?parseHM(d.sleepTime).h*60+parseHM(d.sleepTime).m:null;
   const sess=S.sessions[dateKey]||[];
 
-  ${catRow('sleep',awakeStart,awakeTotalMin)}
+  
   
   
   // Build events list from sessions + logs
@@ -3383,6 +3383,7 @@ function buildTimeline(dateKey){
       </label>
     </div>
     <div style="position:relative;background:var(--bg2);border-radius:6px;border:1px solid var(--border);padding:5px 0 16px 0" id="tl-grid-${uid}" data-datekey="${dateKey}">
+      ${catRow('sleep',awakeStart,awakeTotalMin)}
       ${catRow('work',awakeStart,awakeTotalMin)}
       ${catRow('prep',awakeStart,awakeTotalMin)}
       ${catRow('ent',awakeStart,awakeTotalMin)}

@@ -1674,7 +1674,7 @@ function updateActiveNotifications(){
   WTYPES.forEach(t=>{const a=S.active['w_'+t];if(a){active.push({label:t[0].toUpperCase()+t.slice(1)+(a.proj?' ('+a.proj+')':''),color:'var(--work)',start:a.start});}});
   const fa=S.active['fire'];if(fa)active.push({label:'🧘 Meditation',color:'var(--fire-c)',start:fa.start});
   const sa=S.active['snake'];if(sa)active.push({label:'🐍 Snake',color:'var(--snake)',start:sa.start});
-  ['play','show','outdoor'].forEach(t=>{const a=S.active['ent_'+t];if(a){const ico=t==='play'?'🎮':t==='show'?'📺':'🌿';active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
+  ENT_TYPES.forEach(t=>{const a=S.active['ent_'+t];if(a){const ico={play:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'}[t];active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
   ['cook','meal','transport','sport','shower','other'].forEach(t=>{const a=S.active['prep_'+t];if(a){const ico={cook:'🍳',meal:'🍱',transport:'🚗',sport:'⚽',shower:'🚿',other:'📦'}[t];active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
   EX_KEYS.forEach(t=>{const a=S.active['ex_'+t];if(a){active.push({label:EX_LABELS[t],color:'var(--ex)',start:a.start});}});
   CARDIO_TYPES.forEach(t=>{const a=S.active['cardio_'+t];if(a){const ico={jogging:'🏃',cycling:'🚴',hiit:'🔥'}[t];active.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
@@ -1701,7 +1701,7 @@ setInterval(()=>{
   WTYPES2.forEach(t=>{const a=S.active['w_'+t];if(a)acts.push({label:t[0].toUpperCase()+t.slice(1)+(a.proj?' ('+a.proj+')':''),color:'var(--work)',start:a.start});});
   const fa2=S.active['fire'];if(fa2)acts.push({label:'Meditation',color:'var(--fire-c)',start:fa2.start});
   const sa2=S.active['snake'];if(sa2)acts.push({label:'Heavy',color:'var(--snake)',start:sa2.start});
-  ['play','show','outdoor'].forEach(t=>{const a=S.active['ent_'+t];if(a){const ico=t==='play'?'🎮':t==='show'?'📺':'🌿';acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
+  ENT_TYPES.forEach(t=>{const a=S.active['ent_'+t];if(a){const ico={play:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'}[t];acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--life)',start:a.start});}});
   ['cook','meal','transport','sport','shower','other'].forEach(t=>{const a=S.active['prep_'+t];if(a){const ico={cook:'🍳',meal:'🍱',transport:'🚗',sport:'⚽',shower:'🚿',other:'📦'}[t];acts.push({label:ico+' '+t[0].toUpperCase()+t.slice(1),color:'var(--ex)',start:a.start});}});
   
   EX_KEYS.forEach(t=>{const a=S.active['ex_'+t];if(a){acts.push({label:EX_LABELS[t],color:'var(--ex)',start:a.start});}});
@@ -1832,7 +1832,7 @@ function toggleWork(type){
   const a=S.active['w_'+type];
   if(a){
     const el=Math.round(elMin(a.start));
-    showModal(`<h3 style="color:var(--work)">Stop ${type[0].toUpperCase()+type.slice(1)}</h3><p style="color:var(--muted);font-size:13px;margin-bottom:10px">Session: ${fmt(el)}</p><label class="mlbl">Wasted (min)</label><input type="number" id="w-wst" placeholder="0" min="0" style="border-color:var(--work)"><div class="mbtns"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" onclick="stopWork('${type}',${a.start})">Done</button></div>`,null);
+    showModal(`<h3 style="color:var(--work)">Stop ${entCap(type)}</h3><p style="color:var(--muted);font-size:13px;margin-bottom:10px">Session: ${fmt(el)}</p><label class="mlbl">Wasted (min)</label><input type="number" id="w-wst" placeholder="0" min="0" style="border-color:var(--work)"><div class="mbtns"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" onclick="stopWork('${type}',${a.start})">Done</button></div>`,null);
   } else {
     const other=WTYPES.find(t2=>t2!==type&&S.active['w_'+t2]);
     if(other){alert('Stop '+other+' first!');return;}
@@ -1857,7 +1857,7 @@ function showStartWorkModal(type){
     }).join('')
   }</div>`:'';
   showModal(`
-    <h3 style="color:var(--work);margin-bottom:12px">Start ${type[0].toUpperCase()+type.slice(1)}</h3>
+    <h3 style="color:var(--work);margin-bottom:12px">Start ${entCap(type)}</h3>
     <label class="mlbl">Project Type</label>
     <div class="ws-type-grid" id="ws-type-grid">${typeGrid}</div>
     <input type="text" id="w-ptype" placeholder="Or type custom..." value="${defType.replace(/"/g,'&quot;')}" style="border-color:var(--work);margin-bottom:10px">
@@ -1987,20 +1987,38 @@ function saveYesterdaySleep(){
 
 // Nap logging (key in duration in minutes)
 function logNap(){
-  showModal(`<h3 style="color:var(--life)">😴 Log Nap</h3><p style="font-size:12px;color:var(--muted);margin-bottom:10px">Enter nap duration in minutes.</p><label class="mlbl">Duration (minutes)</label><input type="number" id="nap-dur-inp" placeholder="e.g. 30" min="1" max="300" style="border-color:var(--life)"><div class="mbtns"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf blife" onclick="saveNap()">Save</button></div>`,null);
-  setTimeout(()=>document.getElementById('nap-dur-inp')?.focus(),80);
+  const now=myDate();
+  const def=pad(now.getUTCHours())+':'+pad(now.getUTCMinutes());
+  showModal(`<h3 style="color:var(--life)">😴 Log Nap</h3>
+    <label class="mlbl">Start Time</label>
+    <input type="time" id="nap-start" value="${def}" style="border-color:var(--life)">
+    <label class="mlbl">End Time</label>
+    <input type="time" id="nap-end" value="${def}" style="border-color:var(--life)">
+    <div class="mbtns">
+      <button class="bcanc" onclick="closeModal()">Cancel</button>
+      <button class="bconf blife" onclick="saveNap()">Save</button>
+    </div>`,null);
 }
+  
 function saveNap(){
-  const dur=parseInt(document.getElementById('nap-dur-inp')?.value)||0;
-  if(!dur){closeModal();return;}
+  const startStr=document.getElementById('nap-start')?.value;
+  const endStr=document.getElementById('nap-end')?.value;
+  if(!startStr||!endStr){closeModal();return;}
+  const{h:sh,m:sm}=parseHM(startStr);
+  const{h:eh,m:em}=parseHM(endStr);
+  let startMin=toMin(sh,sm),endMin=toMin(eh,em);
+  if(endMin<=startMin)endMin+=1440;
+  const dur=Math.round(endMin-startMin);
+  if(dur<=0){closeModal();return;}
   const d=getToday();
+  if(!d.napLog)d.napLog=[];
+  d.napLog.push({start:startStr,end:endStr,dur,startMin,endMin,ts:nowTs()});
   d.napCount=(d.napCount||0)+1;
   d.napDur=(d.napDur||0)+dur;
-  // Add nap to today's total sleep hours
   d.sleepHours=Math.round(((d.sleepHours||0)+dur/60)*10)/10;
   save();closeModal();calcSleepStreak();updateLifeUI();
 }
-
+  
 function scheduleSleepReminder(wakeTimeStr){
   // Notify to sleep 17 hours after wake time (to maintain ~7h sleep cycle)
   const{h,m}=parseHM(wakeTimeStr);
@@ -2034,13 +2052,16 @@ function getSleepAdvice(){
 
 // ═══ ENTERTAINMENT (6 types) ═══
 const ENT_TYPES=['play','show','outdoor','clean','laydown','date'];
+const ENT_KEY_MAP={play:'Game',show:'Show',outdoor:'Outdoor',clean:'Clean',laydown:'Laydown',date:'Date'};
+function entCap(type){return ENT_KEY_MAP[type]||entCap(type);}
+  
 function toggleEnt(type){
   const a=S.active['ent_'+type];
   if(a){
     const el=Math.round(elMin(a.start));
     const d=getToday();
     const keyMap={play:'Game',show:'Show',outdoor:'Outdoor',clean:'Clean',laydown:'Laydown',date:'Date'};
-    const cap=keyMap[type]||type[0].toUpperCase()+type.slice(1);
+    const cap=keyMap[type]||entCap(type);
     d['ent'+cap]=(d['ent'+cap]||0)+el;
     d['ent'+cap+'Sessions']=(d['ent'+cap+'Sessions']||0)+1;
     if(!d['ent'+cap+'Log'])d['ent'+cap+'Log']=[];
@@ -2049,13 +2070,13 @@ function toggleEnt(type){
     delete S.active['ent_'+type];save();updateLifeUI();
   } else {
     const icons={play:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'};
-    showModal(`<h3 style="color:var(--life)">${icons[type]} ${type[0].toUpperCase()+type.slice(1)}</h3><label class="mlbl">Name</label><input type="text" id="ent-nm" placeholder="${type==='play'?'Play name':'Show / place name'}..." style="border-color:var(--life)"><div class="mbtns"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf blife" onclick="startEnt('${type}')">Start</button></div>`,null);
+    showModal(`<h3 style="color:var(--life)">${icons[type]} ${entCap(type)}</h3><label class="mlbl">Name</label><input type="text" id="ent-nm" placeholder="${type==='play'?'Play name':'Show / place name'}..." style="border-color:var(--life)"><div class="mbtns"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf blife" onclick="startEnt('${type}')">Start</button></div>`,null);
   }
 }
 function startEnt(type){
   const name=(document.getElementById('ent-nm')?.value||'').trim();
   const d=getToday();
-  const nameKey='ent'+type[0].toUpperCase()+type.slice(1)+'Names';
+  const nameKey='ent'+entCap(type)+'Names';
   if(name)d[nameKey]=[...(d[nameKey]||[]),name];
   S.active['ent_'+type]={start:nowTs(),name};save();closeModal();updateLifeUI();
 }
@@ -2116,7 +2137,7 @@ function togglePrep(type){
   if(a){
     const el=Math.round(elMin(a.start));
     const d=getToday();
-    const cap=type[0].toUpperCase()+type.slice(1);
+    const cap=entCap(type);
     const key='prep'+cap;
     d[key]=(d[key]||0)+el;
     if(!d[key+'Log'])d[key+'Log']=[];
@@ -2369,7 +2390,7 @@ function updateLifeUI(){
     const a=S.active['ent_'+type];
     const btn=document.getElementById('ebt-'+type);
     btn.className='ent-btn'+(a?' act-life':(isOver?' magenta':''));
-    const cap=entKeyMap[type]||type[0].toUpperCase()+type.slice(1);
+    const cap=entKeyMap[type]||entCap(type);
     const durEl=document.getElementById('edur-'+type);
     if(durEl){const v=d['ent'+cap]||0;durEl.textContent=v?fmt(v):'0m';durEl.style.color=a?'var(--life)':'var(--muted)';}
   });
@@ -2434,7 +2455,7 @@ function updateLifeUI(){
   PREP_TYPES.forEach(type=>{
     const a=S.active['prep_'+type];
     const btn=document.getElementById('pbt-'+type);if(btn)btn.className='prep-btn'+(a?' act-prep':'');
-    const cap=type[0].toUpperCase()+type.slice(1);
+    const cap=entCap(type);
     const durEl=document.getElementById('pdur-'+type);
     if(durEl){const v=d['prep'+cap]||0;durEl.textContent=v?fmt(v):'0m';durEl.style.color=a?'var(--ex)':'var(--muted)';}
   });
@@ -3189,8 +3210,14 @@ function buildDailyCompact(dateKey){
     buildWorkTree(typeTree),
     compactSec('🌙 Life','var(--life)',[
       ['Wake',d.wakeTime||'—','var(--life)'],
-      ['Sleep',d.sleepHours?fmtH(d.sleepHours):'—','var(--life)'],
-      ['Nap',(d.napCount||0)>0?((d.napCount)+'× '+fmt(d.napDur||0)):'—'],
+      ['Sleep (last night)',d.sleepHours?fmtH(d.sleepHours):'—','var(--life)'],
+      ['Slept at',(()=>{const yk=new Date(new Date(dateKey+'T00:00:00').getTime()-86400000).toISOString().slice(0,10);return(S.daily[yk]&&S.daily[yk].sleepTime)||'—';})()],
+      ['Woke at',d.wakeTime||'—'],
+      ['Sleep tonight',d.sleepTime||'—'],
+      ['Nap',(d.napCount||0)>0?(d.napCount+'× '+fmt(d.napDur||0)):'—'],
+    ]),
+
+    compactSec('Entertainment','var(--life)',[  
       ['Entertainment',fmt(entT),'var(--life)'],
       ['🎮 Play',fmtLog(d.entGameLog)],
       ['📺 Show',fmtLog(d.entShowLog)],
@@ -3200,6 +3227,7 @@ function buildDailyCompact(dateKey){
       ['💕 Date',fmtLog(d.entDateLog)],
       ['Meditation',d.hadFire?'Yes ×'+(d.fireCount||0)+' ('+fmt(d.fireDur||0)+')':'Clean ✓', d.hadFire?'#ff4444':'#13b5a6'],
     ]),
+    
     compactSec('🛠 Preparation','var(--ex)',[
       ['Total',fmt(prepTotalDay(d)),'var(--ex)'],
       ['🍳 Cook',fmtLog(d.prepCookLog)],
@@ -3230,7 +3258,7 @@ function buildTimeline(dateKey){
   const sleepMin=d.sleepTime?parseHM(d.sleepTime).h*60+parseHM(d.sleepTime).m:null;
   const sess=S.sessions[dateKey]||[];
 
-
+  ${catRow('sleep',awakeStart,awakeTotalMin)}
   
   
   // Build events list from sessions + logs
@@ -3294,12 +3322,17 @@ function buildTimeline(dateKey){
     });
   });
 
-  
+   // Fire bars
   (d.fireLog||[]).forEach(entry=>{
     const dur=typeof entry==='object'?entry.dur:entry;
     const endMs=typeof entry==='object'?entry.end:null;
     const endM=endMs?tsToMytMin(endMs):(wakeMin||420)+dur;
     events.push({label:'🧘 Meditate',color:'#ff6b35',start:endM-dur,end:endM,cat:'med'});
+  });
+
+  // Nap bars
+  (d.napLog||[]).forEach(nap=>{
+    events.push({label:'😴 Nap '+fmt(nap.dur),color:'#a8d8ea',start:nap.startMin,end:nap.endMin,cat:'sleep'});
   });
 
   events.sort((a,b)=>a.start-b.start);
@@ -3324,13 +3357,16 @@ function buildTimeline(dateKey){
   }
 
   function timeLabels(startMin,totalMin){
-    const hrs=totalMin<=600?[Math.floor(startMin/60),Math.floor(startMin/60)+3,Math.floor(startMin/60)+6,Math.floor(startMin/60)+9]:[0,4,8,12,16,20,23];
-    return hrs.map(h=>{
-      const pct=((h*60-startMin)/totalMin*100);
-      if(pct<0||pct>98)return'';
-      return`<div style="position:absolute;left:${pct.toFixed(1)}%;font-size:9px;color:var(--muted);transform:translateX(-50%)">${pad(h)}:00</div>`;
-    }).join('');
-  }
+  const hrs=totalMin<=600
+    ?[Math.floor(startMin/60)+1,Math.floor(startMin/60)+3,Math.floor(startMin/60)+6,Math.floor(startMin/60)+8]
+    :[1,4,8,12,16,20,23];
+  return hrs.map(h=>{
+    if(h===0||h>=24)return'';
+    const pct=((h*60-startMin)/totalMin*100);
+    if(pct<3||pct>95)return'';
+    return`<div style="position:absolute;left:${pct.toFixed(1)}%;font-size:9px;color:var(--muted);transform:translateX(-50%);white-space:nowrap">${pad(h)}:00</div>`;
+  }).join('');
+}
 
   const uid='tl'+Math.random().toString(36).slice(2,6);
   const awakeTotalMin=sleepMin&&wakeMin?(sleepMin>wakeMin?sleepMin-wakeMin:sleepMin+1440-wakeMin):960;
@@ -3450,7 +3486,7 @@ function rebuildGridRows(uid,dateKey,startMin,totalMin,isFull){
     const w=Math.max(0.5,((ev.end-ev.start)/totalMin*100)).toFixed(2);
     return`<div style="position:absolute;left:${l}%;width:${w}%;height:100%;background:${ev.color};border-radius:2px" title="${ev.label}"></div>`;
   }
-  const cats={work:{color:'#dfb67e',label:'Work'},prep:{color:'#13b5a6',label:'Prep'},ent:{color:'#ee4996',label:'Ent'},snake:{color:'#9b59b6',label:'Heavy'},med:{color:'#ff6b35',label:'Meditate'}};
+  const cats={work:{color:'#dfb67e',label:'Work'},prep:{color:'#13b5a6',label:'Prep'},ent:{color:'#ee4996',label:'Ent'},snake:{color:'#9b59b6',label:'Heavy'},med:{color:'#ff6b35',label:'Meditate'},sleep:{color:'#7ec8e3',label:'Sleep'}};
   function catRow(key){
     const evs=events.filter(e=>e.cat===key);if(!evs.length)return'';
     const c=cats[key];

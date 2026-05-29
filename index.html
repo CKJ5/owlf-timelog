@@ -2053,7 +2053,7 @@ function getSleepAdvice(){
 // ═══ ENTERTAINMENT (6 types) ═══
 const ENT_TYPES=['play','show','outdoor','clean','laydown','date'];
 const ENT_KEY_MAP={play:'Game',show:'Show',outdoor:'Outdoor',clean:'Clean',laydown:'Laydown',date:'Date'};
-function entCap(type){return ENT_KEY_MAP[type]||entCap(type);}
+function entCap(type){return ENT_KEY_MAP[type]||type[0].toUpperCase()+type.slice(1);}
   
 function toggleEnt(type){
   const a=S.active['ent_'+type];

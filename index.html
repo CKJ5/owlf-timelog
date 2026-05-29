@@ -3337,7 +3337,7 @@ function buildTimeline(dateKey){
 
   events.sort((a,b)=>a.start-b.start);
 
-  const cats={work:{color:'#dfb67e',label:'Work'},prep:{color:'#13b5a6',label:'Prep'},ent:{color:'#ee4996',label:'Ent'},snake:{color:'#9b59b6',label:'Heavy'},med:{color:'#ff6b35',label:'Meditate'}};
+  const cats={work:{color:'#dfb67e',label:'Work'},prep:{color:'#13b5a6',label:'Prep'},ent:{color:'#ee4996',label:'Ent'},snake:{color:'#9b59b6',label:'Heavy'},med:{color:'#ff6b35',label:'Meditate'},sleep:{color:'#7ec8e3',label:'Sleep'}};
 
   function bar(ev,startMin,totalMin){
     const l=((ev.start-startMin)/totalMin*100).toFixed(2);

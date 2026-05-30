@@ -3403,25 +3403,21 @@ function buildTimeline(dateKey){
   const tlYdDay=S.daily[tlYdKey];
   const tlTmrDay=S.daily[tlTmrKey];
 
-  // Last night: ydDay.sleepTime -> today wakeTime
-  // Only show in full 24h (start may be before awakeStart)
+  // Last night: yesterday's sleepTime → today's wakeTime
   if(tlYdDay&&tlYdDay.sleepTime&&wakeMin!==null){
     const{h:sh,m:sm}=parseHM(tlYdDay.sleepTime);
-    const sleepStartAbs=(sh*60+sm)-1440; // negative = before today midnight
-    // clip to 0 for full 24h display; in awake mode this won't show (before axis start)
+    const sleepStartAbs=(sh*60+sm)-1440;
     events.push({label:'🌙 Last Sleep',color:'#7ec8e3',start:Math.max(sleepStartAbs,0),end:wakeMin,cat:'sleep'});
   }
-  // Nap bars (always visible if within awake window)
+  // Nap bars
   (d.napLog||[]).forEach((nap,i)=>{
-    events.push({label:'😴 Nap'+(( d.napLog||[]).length>1?' '+(i+1):''),color:'#a8d8ea',start:nap.startMin,end:nap.endMin,cat:'sleep'});
+    events.push({label:'😴 Nap'+((d.napLog||[]).length>1?' '+(i+1):''),color:'#a8d8ea',start:nap.startMin,end:nap.endMin,cat:'sleep'});
   });
-  // Tonight: today sleepTime -> tomorrow wakeTime (or end of axis)
+  // Tonight: today's sleepTime → tomorrow's wakeTime (pending if tomorrow not logged yet)
   if(sleepMin!==null){
     const tmrWakeMin=tlTmrDay&&tlTmrDay.wakeTime?(parseHM(tlTmrDay.wakeTime).h*60+parseHM(tlTmrDay.wakeTime).m):null;
-    // In awake mode axis ends at sleepMin roughly, tonight bar shows from sleepMin to axis end
-    // In full 24h mode show sleepMin to 1440 (midnight)
-    const barEnd=tmrWakeMin!==null?1440:1440; // always goes to end of today axis
-    events.push({label:'😴 Tonight',color:'#4a90d9',start:sleepMin,end:barEnd,cat:'sleep'});
+    const barEnd=tmrWakeMin!==null?tmrWakeMin+1440:1440;
+    events.push({label:tmrWakeMin!==null?'😴 Tonight ('+fmtH(Math.round(((tmrWakeMin+1440-sleepMin)%1440)/60*10)/10)+')':'😴 Tonight (pending)',color:'#4a90d9',start:sleepMin,end:1440,cat:'sleep'});
   }
 
   

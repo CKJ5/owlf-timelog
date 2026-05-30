@@ -3209,27 +3209,79 @@ function buildDailyCompact(dateKey){
     overSec,
     buildWorkTree(typeTree),
     (()=>{
+      // Key dates
       const ydKey=new Date(new Date(dateKey+'T00:00:00').getTime()-86400000).toISOString().slice(0,10);
-      const ydSleepTime=(S.daily[ydKey]&&S.daily[ydKey].sleepTime)||null;
       const tmrKey=new Date(new Date(dateKey+'T00:00:00').getTime()+86400000).toISOString().slice(0,10);
-      const tmrWakeTime=(S.daily[tmrKey]&&S.daily[tmrKey].wakeTime)||null;
+      const ydDay=S.daily[ydKey];
+      const tmrDay=S.daily[tmrKey];
+
+      // Last sleep: ydDay.sleepTime -> d.wakeTime
+      const lastSleepStart=ydDay&&ydDay.sleepTime?ydDay.sleepTime:null;
+      const lastSleepEnd=d.wakeTime||null;
+      const lastSleepDur=d.sleepHours?fmtH(d.sleepHours):'—';
+
+      // Tonight sleep: d.sleepTime -> tmrDay.wakeTime
+      const tonightStart=d.sleepTime||null;
+      const tmrWake=tmrDay&&tmrDay.wakeTime?tmrDay.wakeTime:null;
+      let tonightDur='—';
+      if(tonightStart&&tmrWake){
+        const{h:sh,m:sm}=parseHM(tonightStart);
+        const{h:wh,m:wm}=parseHM(tmrWake);
+        let sMin=toMin(sh,sm),wMin=toMin(wh,wm);
+        if(wMin<=sMin)wMin+=1440;
+        const hrs=(wMin-sMin)/60;
+        if(hrs>0&&hrs<20)tonightDur=fmtH(Math.round(hrs*10)/10);
+      } else if(tonightStart){
+        tonightDur=tonightStart+' →';
+      }
+
+      // Nap
       const napEntries=d.napLog||[];
-      const sleepDetailId='sldet_'+dateKey;
-      const sleepDetail=`
-        <div id="${sleepDetailId}" style="display:none;margin-top:4px;padding-top:6px;border-top:1px solid var(--border)">
-          <div class="compact-row"><span style="color:var(--muted);font-size:11px">🌙 Last Sleep</span><span class="compact-val" style="color:var(--life)">${ydSleepTime||'—'} → ${d.wakeTime||'—'}</span></div>
-          ${napEntries.map((n,i)=>`<div class="compact-row"><span style="color:var(--muted);font-size:11px">😴 Nap ${napEntries.length>1?i+1:''}</span><span class="compact-val" style="color:var(--life)">${n.start} → ${n.end}</span></div>`).join('')}
-          <div class="compact-row"><span style="color:var(--muted);font-size:11px">😴 Tonight</span><span class="compact-val" style="color:var(--life)">${d.sleepTime||'—'} → ${tmrWakeTime||'?'}</span></div>
-        </div>`;
+      const napTotal=d.napDur?fmt(d.napDur):'—';
+
+      // Collapsible detail id
+      const sleepDetId='sldet_'+dateKey;
+
       return`<div class="compact-section">
-        <div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--life);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:5px">🌙 Life</div>
-        <div class="compact-row"><span style="color:var(--muted);font-size:12px">Last Sleep</span><span class="compact-val" style="color:var(--life)">${d.sleepHours?fmtH(d.sleepHours):'—'}</span></div>
-        <div class="compact-row"><span style="color:var(--muted);font-size:12px">Nap</span><span class="compact-val" style="color:var(--life)">${d.napDur?fmt(d.napDur):'—'}</span></div>
-        <div class="compact-row"><span style="color:var(--muted);font-size:12px">Tonight</span><span class="compact-val" style="color:var(--life)">${d.sleepTime||'—'}</span></div>
-        <div onclick="var e=document.getElementById('${sleepDetailId}');e.style.display=e.style.display==='none'?'block':'none';this.querySelector('.sd-arr').textContent=e.style.display==='none'?'▾':'▴'" style="cursor:pointer;padding:4px 0;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;margin-top:4px">
-          <span>Sleep Details</span><span class="sd-arr">▾</span>
+        <div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--life);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:5px">🌙 Sleep</div>
+
+        <div class="compact-row">
+          <span style="color:var(--muted);font-size:12px">Last Sleep</span>
+          <span class="compact-val" style="color:var(--life)">${lastSleepDur}</span>
         </div>
-        ${sleepDetail}
+        <div class="compact-row">
+          <span style="color:var(--muted);font-size:12px">Nap</span>
+          <span class="compact-val" style="color:var(--life)">${napTotal}</span>
+        </div>
+        <div class="compact-row">
+          <span style="color:var(--muted);font-size:12px">Tonight</span>
+          <span class="compact-val" style="color:var(--life)">${tonightDur}</span>
+        </div>
+
+        <div onclick="(function(el,arr){el.style.display=el.style.display==='none'?'block':'none';arr.textContent=el.style.display==='none'?'▾':'▴';})(document.getElementById('${sleepDetId}'),this.querySelector('.sd-arr'))"
+          style="cursor:pointer;padding:5px 0 2px;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:4px">
+          <span>Details</span><span class="sd-arr">▾</span>
+        </div>
+
+        <div id="${sleepDetId}" style="display:none;margin-top:4px">
+          <div class="compact-row">
+            <span style="color:var(--muted);font-size:11px">🌙 Last Sleep</span>
+            <span class="compact-val" style="color:var(--life);font-size:11px">${lastSleepStart||'—'} → ${lastSleepEnd||'—'}</span>
+          </div>
+          ${napEntries.length?napEntries.map((n,i)=>`
+          <div class="compact-row">
+            <span style="color:var(--muted);font-size:11px">😴 Nap${napEntries.length>1?' '+(i+1):''}</span>
+            <span class="compact-val" style="color:var(--life);font-size:11px">${n.start} → ${n.end}</span>
+          </div>`).join(''):`
+          <div class="compact-row">
+            <span style="color:var(--muted);font-size:11px">😴 Nap</span>
+            <span class="compact-val" style="font-size:11px">—</span>
+          </div>`}
+          <div class="compact-row">
+            <span style="color:var(--muted);font-size:11px">😴 Tonight</span>
+            <span class="compact-val" style="color:var(--life);font-size:11px">${tonightStart||'—'} → ${tmrWake||'?'}</span>
+          </div>
+        </div>
       </div>`;
     })(),
 
@@ -3346,22 +3398,31 @@ function buildTimeline(dateKey){
     events.push({label:'🧘 Meditate',color:'#ff6b35',start:endM-dur,end:endM,cat:'med'});
   });
 
-  // Sleep bars
+// Sleep bars
   const tlYdKey=new Date(new Date(dateKey+'T00:00:00').getTime()-86400000).toISOString().slice(0,10);
+  const tlTmrKey=new Date(new Date(dateKey+'T00:00:00').getTime()+86400000).toISOString().slice(0,10);
   const tlYdDay=S.daily[tlYdKey];
-  // Last night sleep bar (only visible in full 24h, clipped to 00:00)
+  const tlTmrDay=S.daily[tlTmrKey];
+
+  // Last night: ydDay.sleepTime -> today wakeTime
+  // Only show in full 24h (start may be before awakeStart)
   if(tlYdDay&&tlYdDay.sleepTime&&wakeMin!==null){
     const{h:sh,m:sm}=parseHM(tlYdDay.sleepTime);
-    const sleepStartAbs=(sh*60+sm)-1440; // minutes relative to today 00:00, negative
+    const sleepStartAbs=(sh*60+sm)-1440; // negative = before today midnight
+    // clip to 0 for full 24h display; in awake mode this won't show (before axis start)
     events.push({label:'🌙 Last Sleep',color:'#7ec8e3',start:Math.max(sleepStartAbs,0),end:wakeMin,cat:'sleep'});
   }
-  // Nap bars
+  // Nap bars (always visible if within awake window)
   (d.napLog||[]).forEach((nap,i)=>{
-    events.push({label:'😴 Nap'+(d.napLog.length>1?' '+(i+1):''),color:'#a8d8ea',start:nap.startMin,end:nap.endMin,cat:'sleep'});
+    events.push({label:'😴 Nap'+(( d.napLog||[]).length>1?' '+(i+1):''),color:'#a8d8ea',start:nap.startMin,end:nap.endMin,cat:'sleep'});
   });
-  // Tonight sleep bar (from sleepTime to end of day)
+  // Tonight: today sleepTime -> tomorrow wakeTime (or end of axis)
   if(sleepMin!==null){
-    events.push({label:'😴 Tonight',color:'#4a90d9',start:sleepMin,end:1440,cat:'sleep'});
+    const tmrWakeMin=tlTmrDay&&tlTmrDay.wakeTime?(parseHM(tlTmrDay.wakeTime).h*60+parseHM(tlTmrDay.wakeTime).m):null;
+    // In awake mode axis ends at sleepMin roughly, tonight bar shows from sleepMin to axis end
+    // In full 24h mode show sleepMin to 1440 (midnight)
+    const barEnd=tmrWakeMin!==null?1440:1440; // always goes to end of today axis
+    events.push({label:'😴 Tonight',color:'#4a90d9',start:sleepMin,end:barEnd,cat:'sleep'});
   }
 
   
@@ -3526,29 +3587,35 @@ function rebuildGridRows(uid,dateKey,startMin,totalMin,isFull){
   }
   
   const tlYdKey2=new Date(new Date(dateKey+'T00:00:00').getTime()-86400000).toISOString().slice(0,10);
+  const tlTmrKey2=new Date(new Date(dateKey+'T00:00:00').getTime()+86400000).toISOString().slice(0,10);
   const tlYdDay2=S.daily[tlYdKey2];
+  const tlTmrDay2=S.daily[tlTmrKey2];
   const sleepMinRb=d.sleepTime?(parseHM(d.sleepTime).h*60+parseHM(d.sleepTime).m):null;
   const wakeMinRb=d.wakeTime?(parseHM(d.wakeTime).h*60+parseHM(d.wakeTime).m):null;
   let sleepRow='';
-  if(isFull){
-    // Last night sleep
-    if(tlYdDay2&&tlYdDay2.sleepTime&&wakeMinRb!==null){
-      const{h:sh,m:sm}=parseHM(tlYdDay2.sleepTime);
-      const sStart=Math.max((sh*60+sm)-1440,0);
-      sleepRow+=`<div style="position:relative;height:12px;margin:0 0 3px 0"><div style="position:absolute;left:${(sStart/totalMin*100).toFixed(2)}%;width:${((wakeMinRb-sStart)/totalMin*100).toFixed(2)}%;height:100%;background:#7ec8e3;border-radius:2px;opacity:0.7"></div><div style="position:absolute;right:2px;top:1px;font-size:8px;color:#7ec8e3">Sleep</div></div>`;
+  // Last night bar
+  if(tlYdDay2&&tlYdDay2.sleepTime&&wakeMinRb!==null){
+    const{h:sh,m:sm}=parseHM(tlYdDay2.sleepTime);
+    const sStart=isFull?Math.max((sh*60+sm)-1440,0):0;
+    const sEnd=isFull?wakeMinRb:wakeMinRb;
+    if(sEnd>sStart){
+      const l=(sStart/totalMin*100).toFixed(2);
+      const w=((sEnd-sStart)/totalMin*100).toFixed(2);
+      sleepRow+=`<div style="position:relative;height:12px;margin:0 0 3px 0"><div style="position:absolute;left:${l}%;width:${w}%;height:100%;background:#7ec8e3;border-radius:2px;opacity:0.7"></div><div style="position:absolute;right:2px;top:1px;font-size:8px;color:#7ec8e3">Sleep</div></div>`;
     }
-    // Nap bars
-    (d.napLog||[]).forEach((nap,i)=>{
-      const l=(nap.startMin/totalMin*100).toFixed(2);
-      const w=((nap.endMin-nap.startMin)/totalMin*100).toFixed(2);
-      sleepRow+=`<div style="position:relative;height:8px;margin:0 0 2px 0"><div style="position:absolute;left:${l}%;width:${w}%;height:100%;background:#a8d8ea;border-radius:2px"></div></div>`;
-    });
-    // Tonight
-    if(sleepMinRb!==null){
-      const l=(sleepMinRb/totalMin*100).toFixed(2);
-      const w=((totalMin-sleepMinRb)/totalMin*100).toFixed(2);
-      sleepRow+=`<div style="position:relative;height:12px;margin:0 0 3px 0"><div style="position:absolute;left:${l}%;width:${w}%;height:100%;background:#4a90d9;border-radius:2px;opacity:0.6"></div><div style="position:absolute;right:2px;top:1px;font-size:8px;color:#4a90d9">Tonight</div></div>`;
-    }
+  }
+  // Nap bars
+  (d.napLog||[]).forEach((nap,i)=>{
+    const l=(nap.startMin/totalMin*100).toFixed(2);
+    const w=((nap.endMin-nap.startMin)/totalMin*100).toFixed(2);
+    sleepRow+=`<div style="position:relative;height:8px;margin:0 0 2px 0"><div style="position:absolute;left:${l}%;width:${w}%;height:100%;background:#a8d8ea;border-radius:2px"></div></div>`;
+  });
+  // Tonight bar
+  if(sleepMinRb!==null){
+    const l=(sleepMinRb/totalMin*100).toFixed(2);
+    const w=((totalMin-sleepMinRb)/totalMin*100).toFixed(2);
+    sleepRow+=`<div style="position:relative;height:12px;margin:0 0 3px 0"><div style="position:absolute;left:${l}%;width:${w}%;height:100%;background:#4a90d9;border-radius:2px;opacity:0.6"></div><div style="position:absolute;right:2px;top:1px;font-size:8px;color:#4a90d9">Tonight</div></div>`;
+  }
   }
   
   const hrs=isFull?[0,4,8,12,16,20,23]:[Math.floor(startMin/60),Math.floor(startMin/60)+3,Math.floor(startMin/60)+6];

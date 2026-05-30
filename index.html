@@ -3230,8 +3230,8 @@ function buildDailyCompact(dateKey){
         if(wMin<=sMin)wMin+=1440;
         const hrs=(wMin-sMin)/60;
         tonightDur=(hrs>0&&hrs<20)?fmtH(Math.round(hrs*10)/10):'pending';
-      } else if(!tonightStart){
-        tonightDur='—';
+      } else if(tonightStart){
+        tonightDur=tonightStart+' →';
       }
 
       // Nap

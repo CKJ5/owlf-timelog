@@ -3226,8 +3226,6 @@ function buildDailyCompact(dateKey){
         <div class="compact-row"><span style="color:var(--muted);font-size:12px">Last Sleep</span><span class="compact-val" style="color:var(--life)">${d.sleepHours?fmtH(d.sleepHours):'—'}</span></div>
         <div class="compact-row"><span style="color:var(--muted);font-size:12px">Nap</span><span class="compact-val" style="color:var(--life)">${d.napDur?fmt(d.napDur):'—'}</span></div>
         <div class="compact-row"><span style="color:var(--muted);font-size:12px">Tonight</span><span class="compact-val" style="color:var(--life)">${d.sleepTime||'—'}</span></div>
-        <div class="compact-row"><span style="color:var(--muted);font-size:12px">Entertainment</span><span class="compact-val" style="color:var(--life)">${fmt(entT)}</span></div>
-        <div class="compact-row"><span style="color:var(--muted);font-size:12px">Meditation</span><span class="compact-val" style="color:${d.hadFire?'#ff4444':'#13b5a6'}">${d.hadFire?'Yes ×'+(d.fireCount||0)+' ('+fmt(d.fireDur||0)+')':'Clean ✓'}</span></div>
         <div onclick="var e=document.getElementById('${sleepDetailId}');e.style.display=e.style.display==='none'?'block':'none';this.querySelector('.sd-arr').textContent=e.style.display==='none'?'▾':'▴'" style="cursor:pointer;padding:4px 0;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;margin-top:4px">
           <span>Sleep Details</span><span class="sd-arr">▾</span>
         </div>

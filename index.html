@@ -3127,7 +3127,57 @@ function navigateReport(dir){
 }
 
 let _cachedReportHtml='';
+// Remember which collapsible sections are open across day navigation
+const _popupOpenSections={};
+
+function _savePopupOpenSections(){
+  const bodyEl=document.getElementById('report-popup-body');
+  if(!bodyEl)return;
+  // Find all collapsible detail divs that are currently visible
+  bodyEl.querySelectorAll('[id^="sldet_"],[id^="tl-det-"],[id^="wt_"],[id^="pt_"],[id^="dc_wt_"],[id^="dc_pt_"]').forEach(el=>{
+    // Extract the section TYPE key — strip the date/day-specific part
+    // e.g. 'sldet_2026-05-31' → 'sldet'
+    // e.g. 'tl-det_abc123'    → 'tl-det'
+    // e.g. 'wt_design'        → 'wt_design'
+    // e.g. 'dc_wt_2026-05-31_design' → 'dc_wt_design'
+    let typeKey=el.id;
+    // Strip date suffix (YYYY-MM-DD)
+    typeKey=typeKey.replace(/_\d{4}-\d{2}-\d{2}/g,'');
+    // Strip random uid suffix from tl-det (4 chars after last _)
+    typeKey=typeKey.replace(/tl-det-[a-z0-9]+/,'tl-det');
+    const isOpen=el.style.display!=='none'&&el.style.maxHeight!=='0px'&&el.style.maxHeight!=='';
+    _popupOpenSections[typeKey]=isOpen;
+  });
+}
+
+function _restorePopupOpenSections(){
+  const bodyEl=document.getElementById('report-popup-body');
+  if(!bodyEl)return;
+  bodyEl.querySelectorAll('[id^="sldet_"],[id^="tl-det-"],[id^="wt_"],[id^="pt_"],[id^="dc_wt_"],[id^="dc_pt_"]').forEach(el=>{
+    let typeKey=el.id;
+    typeKey=typeKey.replace(/_\d{4}-\d{2}-\d{2}/g,'');
+    typeKey=typeKey.replace(/tl-det-[a-z0-9]+/,'tl-det');
+    if(!_popupOpenSections[typeKey])return;
+    // Restore open state
+    if(el.id.startsWith('sldet_')){
+      el.style.display='block';
+      // Flip the arrow
+      const toggle=el.previousElementSibling;
+      if(toggle){const arr=toggle.querySelector('.sd-arr');if(arr)arr.textContent='▴';}
+    } else if(el.id.startsWith('tl-det-')){
+      el.style.maxHeight=el.scrollHeight+'px';
+      setTimeout(()=>{if(el.style.maxHeight!=='0px')el.style.maxHeight='none';},350);
+      const arr=document.getElementById('tl-arr-'+el.id.replace('tl-det-',''));
+      if(arr)arr.textContent='▴';
+    } else {
+      // wt_, pt_, dc_wt_, dc_pt_ — simple display toggle
+      el.style.display='block';
+    }
+  });
+}
+
 function openReportPopup(){
+  _savePopupOpenSections();
   let html='';
   if(rMode==='daily')html=buildDailyCompact(rSel);
   else if(rMode==='weekly')html=buildWeeklyCompact(rSel);
@@ -3146,7 +3196,9 @@ function openReportPopup(){
   }
   const overlay=document.getElementById('report-popup-overlay');
   overlay.classList.remove('hidden');
-  // Swipe on popup body: left/right = navigate, down = close
+  // Restore open sections after HTML is injected
+  _restorePopupOpenSections();
+  // Swipe on popup body
   if(bodyEl){
     let _sx=0,_sy=0;
     const newBody=bodyEl.cloneNode(true);
@@ -3156,13 +3208,16 @@ function openReportPopup(){
       const dx=_sx-e.changedTouches[0].clientX;
       const dy=e.changedTouches[0].clientY-_sy;
       const adx=Math.abs(dx);
-      if(dy>70&&adx<50){/* swipe down removed — use X to close */return;}
-
+      if(dy>70&&adx<50){return;}
       if(adx>70&&Math.abs(dy)<adx*0.6){panelNavigate(dx>0?1:-1);}
     },{passive:true});
   }
 }
-function closeReportPopup(){document.getElementById('report-popup-overlay').classList.add('hidden');}
+
+function closeReportPopup(){
+  _savePopupOpenSections();
+  document.getElementById('report-popup-overlay').classList.add('hidden');
+}
 
 // ── COMPACT POPUP REPORT BUILDERS ──────────────────────────────────────────
 function compactSec(title,color,rows){

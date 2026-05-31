@@ -3211,27 +3211,34 @@ function buildDailyCompact(dateKey){
     (()=>{
       const ydKey=new Date(new Date(dateKey+'T00:00:00').getTime()-86400000).toISOString().slice(0,10);
       const tmrKey=new Date(new Date(dateKey+'T00:00:00').getTime()+86400000).toISOString().slice(0,10);
-      const ydDay=S.daily[ydKey];
-      const tmrDay=S.daily[tmrKey];
 
-      // Last Sleep: yesterday's sleepTime → today's wakeTime (duration = d.sleepHours)
-      const lastSleepStart=ydDay&&ydDay.sleepTime?ydDay.sleepTime:null;
-      const lastSleepEnd=d.wakeTime||null;
+      // Last Sleep: yesterday's sleepTime → today's wakeTime
+      // ydDay.sleepTime is set by btn-yday-sleep (saves to yesterday's record)
+      // d.sleepTime is set by btn-sleep-set (saves to today = tonight)
+      // These are DIFFERENT fields — never mix them
+      const ydSleepTime=(S.daily[ydKey]&&S.daily[ydKey].sleepTime)||null;
+      const todayWakeTime=d.wakeTime||null;
       const lastSleepDur=d.sleepHours?fmtH(d.sleepHours):'—';
 
-      // Tonight: today's sleepTime → tomorrow's wakeTime (pending until tomorrow wakes)
-      const tonightStart=d.sleepTime||null;
-      const tmrWake=tmrDay&&tmrDay.wakeTime?tmrDay.wakeTime:null;
-      let tonightDur='pending';
-      if(tonightStart&&tmrWake){
-        const{h:sh,m:sm}=parseHM(tonightStart);
-        const{h:wh,m:wm}=parseHM(tmrWake);
+      // Tonight: today's sleepTime → tomorrow's wakeTime
+      // Must wait for tomorrow's wakeTime — never use today's wakeTime
+      const tonightSleepTime=d.sleepTime||null;
+      const tmrWakeTime=(S.daily[tmrKey]&&S.daily[tmrKey].wakeTime)||null;
+      let tonightDur='—';
+      let tonightDurColor='var(--muted)';
+      if(!tonightSleepTime){
+        tonightDur='—';
+      } else if(!tmrWakeTime){
+        tonightDur='pending';
+        tonightDurColor='var(--muted)';
+      } else {
+        const{h:sh,m:sm}=parseHM(tonightSleepTime);
+        const{h:wh,m:wm}=parseHM(tmrWakeTime);
         let sMin=toMin(sh,sm),wMin=toMin(wh,wm);
         if(wMin<=sMin)wMin+=1440;
         const hrs=(wMin-sMin)/60;
-        tonightDur=(hrs>0&&hrs<20)?fmtH(Math.round(hrs*10)/10):'pending';
-      } else if(tonightStart){
-        tonightDur=tonightStart+' →';
+        if(hrs>0&&hrs<20){tonightDur=fmtH(Math.round(hrs*10)/10);tonightDurColor='var(--life)';}
+        else{tonightDur='pending';tonightDurColor='var(--muted)';}
       }
 
       // Nap
@@ -3253,7 +3260,7 @@ function buildDailyCompact(dateKey){
         </div>
         <div class="compact-row">
           <span style="color:var(--muted);font-size:12px">Tonight</span>
-          <span class="compact-val" style="color:${tonightDur==='pending'?'var(--muted)':tonightDur==='—'?'var(--muted)':'var(--life)'}">${tonightDur}</span>
+          <span class="compact-val" style="color:${tonightDurColor}">${tonightDur}</span>
         </div>
 
         <div onclick="(function(el,arr){el.style.display=el.style.display==='none'?'block':'none';arr.textContent=el.style.display==='none'?'▾':'▴';})(document.getElementById('${sleepDetId}'),this.querySelector('.sd-arr'))"
@@ -3264,7 +3271,7 @@ function buildDailyCompact(dateKey){
         <div id="${sleepDetId}" style="display:none;margin-top:4px">
           <div class="compact-row">
             <span style="color:var(--muted);font-size:11px">🌙 Last Sleep</span>
-            <span class="compact-val" style="color:var(--life);font-size:11px">${lastSleepStart||'—'} → ${lastSleepEnd||'—'}</span>
+            <span class="compact-val" style="color:var(--life);font-size:11px">${ydSleepTime||'—'} → ${todayWakeTime||'—'}</span>
           </div>
           ${napEntries.length?napEntries.map((n,i)=>`
           <div class="compact-row">
@@ -3277,7 +3284,7 @@ function buildDailyCompact(dateKey){
           </div>`}
           <div class="compact-row">
             <span style="color:var(--muted);font-size:11px">😴 Tonight</span>
-            <span class="compact-val" style="color:var(--life);font-size:11px">${tonightStart||'—'} → ${tmrWake||'?'}</span>
+            <span class="compact-val" style="color:${tonightDurColor};font-size:11px">${tonightSleepTime||'—'} → ${tmrWakeTime||'?'}</span>
           </div>
         </div>
       </div>`;

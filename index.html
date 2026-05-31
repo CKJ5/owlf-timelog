@@ -827,12 +827,30 @@ function installPWA(){
 
       </div>
     </div>
-    
-        
+
+
+    <!-- GROUP: Developer -->
+    <div class="set-group">
+      <div class="set-group-hdr" onclick="toggleSetGroup('sg-dev')">
+        <span>🛠 Developer</span><span class="set-group-arrow" id="arr-sg-dev">▾</span>
+      </div>
+      <div class="set-group-body" id="sg-dev">
+        <div class="mlbl" style="margin-bottom:6px">Time Travel (fake today)</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5">Override what the app thinks "today" is. Useful for testing past/future date logic. Leave blank to use real date.</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <input type="date" id="dev-fake-date" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:15px">
+          <button onclick="setFakeDate()" style="padding:10px 16px;border-radius:8px;border:none;background:var(--work);color:#1a1000;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Set</button>
+          <button onclick="clearFakeDate()" style="padding:10px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Clear</button>
+        </div>
+        <div id="dev-fake-date-lbl" style="font-size:11px;color:var(--work);font-family:'Space Mono',monospace;min-height:16px"></div>
+      </div>
+    </div>
+
     <div class="mbtns" style="margin-top:14px"><button class="bcanc" onclick="document.getElementById('settings-overlay').classList.add('hidden')">Close</button></div>
   </div>
 </div>
 
+  
 <!-- MEDAL CALENDAR MODAL -->
 <div class="modal-overlay hidden" id="medal-cal-overlay">
   <div class="modal" style="max-height:85vh">
@@ -1380,7 +1398,36 @@ function getTZOffset(){return S.tzOffset!==undefined?S.tzOffset:8;}
   return d.getUTCHours()*60+d.getUTCMinutes();
   }
   
-function myDate(){const d=new Date();return new Date(d.getTime()+getTZOffset()*3600*1000);}
+let _fakeDate=null;
+function myDate(){
+  const base=_fakeDate?new Date(_fakeDate+'T12:00:00Z'):new Date();
+  return new Date(base.getTime()+getTZOffset()*3600*1000);
+}
+function setFakeDate(){
+  const v=document.getElementById('dev-fake-date').value;
+  if(!v){clearFakeDate();return;}
+  _fakeDate=v;
+  const lbl=document.getElementById('dev-fake-date-lbl');
+  if(lbl)lbl.textContent='⏰ Faking: '+v;
+  updateWorkUI();updateLifeUI();updateExUI();renderReport();
+  alert('Time travel active: '+v+'\nApp now treats this as today.');
+}
+function clearFakeDate(){
+  _fakeDate=null;
+  const inp=document.getElementById('dev-fake-date');
+  if(inp)inp.value='';
+  const lbl=document.getElementById('dev-fake-date-lbl');
+  if(lbl)lbl.textContent='';
+  updateWorkUI();updateLifeUI();updateExUI();renderReport();
+}
+function loadDevSettings(){
+  const inp=document.getElementById('dev-fake-date');
+  if(inp&&_fakeDate)inp.value=_fakeDate;
+  const lbl=document.getElementById('dev-fake-date-lbl');
+  if(lbl)lbl.textContent=_fakeDate?'⏰ Faking: '+_fakeDate:'';
+}
+
+  
 function autoDetectTZ(){
   const offset=-new Date().getTimezoneOffset()/60;
   S.tzOffset=offset;save();
@@ -1581,10 +1628,12 @@ function showSettings(){
   renderPtypeChips();
   renderStylePicker();
   document.getElementById('settings-overlay').classList.remove('hidden');
-
   loadNotifPrefs();
   loadTZSetting();
+  loadDevSettings();
 }
+
+  
 function updateSettingsUI(){renderStylePicker();}
 function toggleSetGroup(id){
   const body=document.getElementById(id);

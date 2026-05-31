@@ -3260,8 +3260,9 @@ function buildDailyCompact(dateKey){
     buildWorkTree(typeTree),
     (()=>{
       // All keys computed fresh — no variables from outer scope
-      const _ydKey=new Date(new Date(dateKey+'T00:00:00').getTime()-86400000).toISOString().slice(0,10);
-      const _tmrKey=new Date(new Date(dateKey+'T00:00:00').getTime()+86400000).toISOString().slice(0,10);
+      const [_dy,_dm,_dd]=dateKey.split('-').map(Number);
+      const _ydKey =new Date(Date.UTC(_dy,_dm-1,_dd-1)).toISOString().slice(0,10);
+      const _tmrKey=new Date(Date.UTC(_dy,_dm-1,_dd+1)).toISOString().slice(0,10);
 
       // Read directly from S.daily with explicit paths — no intermediate variables
       const _ydSleepTime  = S.daily[_ydKey]  && S.daily[_ydKey].sleepTime  ? S.daily[_ydKey].sleepTime  : null;

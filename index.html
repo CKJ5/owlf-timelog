@@ -1526,6 +1526,13 @@ function stripDay(d){
 }
 
   
+function stripForSave(s){
+  const out=Object.assign({},s);
+  out.daily={};
+  Object.keys(s.daily).forEach(k=>{out.daily[k]=stripDay(s.daily[k]);});
+  return out;
+}
+
 function save(){
   // delta sync after local save (debounced 3s)
   clearTimeout(save._t);

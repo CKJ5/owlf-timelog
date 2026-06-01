@@ -1279,6 +1279,7 @@ function installPWA(){
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;margin-top:8px">
     <div><span class="sec-lbl">Analytics</span><div style="font-size:22px;font-weight:700;color:var(--text)">Reports</div></div>
     <div style="display:flex;gap:8px;align-items:center">
+      <button class="theme-btn" id="zero-toggle-btn" onclick="toggleShowZero()" style="font-size:12px">0 hide</button>
       <button class="theme-btn" onclick="showSettings()" style="font-size:14px">⚙ Settings</button>
     </div>
   </div>
@@ -1499,38 +1500,28 @@ function loadS(){
 
 
 
-  function stripDay(d){
+function stripDay(d){
   const out={};
-  const ZERO=['design','games','clients','snakeSessions','snakeDur','fireCount','fireDur',
-    'entGame','entShow','entOutdoor','entClean','entLaydown','entDate',
-    'entGameSessions','entShowSessions','entOutdoorSessions','entCleanSessions','entLaydownSessions','entDateSessions',
-    'napCount','napDur','abs','bicep','pu','bench','jian','bei','exTotal',
-    'prepCook','prepMeal','prepTransport','prepSport','prepShower','prepOther'];
-  const EMPTY=['entGameNames','entShowNames','entOutdoorNames','entCleanNames','entLaydownNames','entDateNames',
-    'entGameLog','entShowLog','entOutdoorLog','entCleanLog','entLaydownLog','entDateLog',
-    'absSets','bicepSets','puSets','benchSets','jianSets','beiSets',
-    'prepCookLog','prepMealLog','prepTransportLog','prepSportLog','prepShowerLog','prepOtherLog',
-    'snakeLog','fireLog','cardio_joggingLog','cardio_cyclingLog','cardio_hiitLog'];
   Object.keys(d).forEach(k=>{
     const v=d[k];
-    if(ZERO.includes(k)&&!v)return;
-    if(EMPTY.includes(k)&&(!v||!v.length))return;
-    if(k==='hadFire'&&!v)return;
-    if(k==='exHit'&&!v)return;
-    if(k==='sleepTime'&&!v)return;
-    if(k==='wakeTime'&&!v)return;
-    if(k==='sleepHours'&&v===null)return;
-    if(k==='wasted'&&!v.design&&!v.games&&!v.clients)return;
-    if(k==='type'&&!v)return;
-    if(k==='plan'&&!v)return;
+    // Skip nulls and undefineds always
+    if(v===null||v===undefined)return;
+    // Skip zero numbers
+    if(typeof v==='number'&&v===0)return;
+    // Skip false booleans
+    if(typeof v==='boolean'&&!v)return;
+    // Skip empty strings
+    if(typeof v==='string'&&!v)return;
+    // Skip empty arrays
+    if(Array.isArray(v)&&!v.length)return;
+    // Skip wasted object if all zeros
+    if(k==='wasted'&&typeof v==='object'&&!Array.isArray(v)){
+      if(!v.design&&!v.games&&!v.clients)return;
+    }
+    // Skip _ts (Firestore server timestamp — not needed in local storage)
+    if(k==='_ts')return;
     out[k]=v;
   });
-  return out;
-}
-function stripForSave(s){
-  const out=Object.assign({},s);
-  out.daily={};
-  Object.keys(s.daily).forEach(k=>{out.daily[k]=stripDay(s.daily[k]);});
   return out;
 }
 
@@ -3385,7 +3376,7 @@ function buildDailyCompact(dateKey){
     })(),
   
 
-    compactSec('Entertainment','var(--life)',[  
+    compactSecFiltered('Entertainment','var(--life)',[
       ['Entertainment',fmt(entT),'var(--life)'],
       ['🎮 Play',fmtLog(d.entGameLog)],
       ['📺 Show',fmtLog(d.entShowLog)],
@@ -3396,7 +3387,7 @@ function buildDailyCompact(dateKey){
       ['Meditation',d.hadFire?'Yes ×'+(d.fireCount||0)+' ('+fmt(d.fireDur||0)+')':'Clean ✓', d.hadFire?'#ff4444':'#13b5a6'],
     ]),
     
-    compactSec('🛠 Preparation','var(--ex)',[
+    compactSecFiltered('🛠 Preparation','var(--ex)',[
       ['Total',fmt(prepTotalDay(d)),'var(--ex)'],
       ['🍳 Cook',fmtLog(d.prepCookLog)],
       ['🍱 Meal',fmtLog(d.prepMealLog)],
@@ -3405,7 +3396,7 @@ function buildDailyCompact(dateKey){
       ['🚿 Shower',fmtLog(d.prepShowerLog)],
       ['📦 Other',fmtLog(d.prepOtherLog)],
     ]),
-    compactSec('💪 Exercise','var(--ex)',[
+    compactSecFiltered('💪 Exercise','var(--ex)',[
       ['Total',d.exTotal||0,'var(--ex)'],
       ...EX_KEYS.map(t=>[EX_LABELS[t], String(d[t]||0)+((d[t+'Sets']&&d[t+'Sets'].length)?' ('+d[t+'Sets'].join('+')+')'  : '')])
     ]),
@@ -4719,6 +4710,40 @@ function clearAllData(){
   if(auth)auth.signOut().catch(()=>{});
   alert('All local data cleared.');location.reload();
 }
+
+// ═══ SHOW/HIDE ZERO DATA IN REPORTS ═══
+let _showZero=false;
+function toggleShowZero(){
+  _showZero=!_showZero;
+  const btn=document.getElementById('zero-toggle-btn');
+  if(btn){
+    btn.textContent=_showZero?'0 show':'0 hide';
+    btn.style.color=_showZero?'var(--work)':'var(--muted)';
+    btn.style.borderColor=_showZero?'var(--work)':'var(--border)';
+  }
+  // Refresh popup if open
+  const pop=document.getElementById('report-popup-overlay');
+  if(pop&&!pop.classList.contains('hidden'))openReportPopup();
+}
+
+// Wrap compactSec to filter zero rows when _showZero is false
+function compactSecFiltered(title,color,rows){
+  const filtered=_showZero?rows:rows.filter(r=>{
+    if(!Array.isArray(r))return true;
+    const val=r[1];
+    if(val===null||val===undefined)return false;
+    const str=String(val).trim();
+    // Hide if value is zero-ish: '0', '0m', '0h', '—', 'pending', empty
+    if(str===''||str==='0'||str==='0m'||str==='0h'||str==='—')return false;
+    // Hide if all parts of a log string are zero: '0m+0m'
+    if(/^(0m\+?)+$/.test(str))return false;
+    return true;
+  });
+  // Don't render section at all if no rows remain (except title-only sections)
+  if(!filtered.length)return'';
+  return compactSec(title,color,filtered);
+}
+
 
 // ═══ INLINE JOURNAL ═══
 function saveInlineJournal(dateKey,val){

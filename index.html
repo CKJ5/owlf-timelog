@@ -2127,6 +2127,35 @@ function startEnt(type){
   const nameKey='ent'+entCap(type)+'Names';
   if(name)d[nameKey]=[...(d[nameKey]||[]),name];
   S.active['ent_'+type]={start:nowTs(),name};save();closeModal();updateLifeUI();
+
+  // Schedule limit warnings based on already-logged time
+  const logged=entTotalDay(getToday());
+  const remaining=(120-logged)*60*1000; // ms until 120min limit
+
+  // Clear any existing scheduled warnings
+  if(window._entWarnTimer10)clearTimeout(window._entWarnTimer10);
+  if(window._entWarnTimerOver)clearTimeout(window._entWarnTimerOver);
+
+  // 10-min warning
+  const warn10At=remaining-(10*60*1000);
+  if(warn10At>0){
+    window._entWarnTimer10=setTimeout(()=>{
+      if(getNotifPref('ent'))sendNotif('⚠️ Entertainment Limit','Only 10 minutes of entertainment remaining today!','owlf-ent-warn');
+    }, warn10At);
+  } else if(remaining>0){
+    // Already past the 10-min warning threshold — fire immediately
+    if(getNotifPref('ent'))sendNotif('⚠️ Entertainment Limit','Under 10 minutes of entertainment remaining today!','owlf-ent-warn');
+  }
+
+  // Over-limit warning
+  if(remaining>0){
+    window._entWarnTimerOver=setTimeout(()=>{
+      if(getNotifPref('ent'))sendNotif('🚨 Entertainment Over Limit','You\'ve hit your 2h entertainment limit today!','owlf-ent-over');
+    }, remaining);
+  } else {
+    // Already over — warn immediately
+    if(getNotifPref('ent'))sendNotif('🚨 Entertainment Over Limit','You\'ve already exceeded your 2h entertainment limit!','owlf-ent-over');
+  }
 }
 
 // ═══ FIRE ═══
@@ -2600,22 +2629,7 @@ setInterval(()=>{
     const timerEl=document.getElementById('ptimer-'+t);
     if(timerEl){timerEl.style.display=a?'block':'none';if(a)timerEl.textContent=fmtSec(elSec(a.start));}
   });
-  // Entertainment 10-min warning: warn when total (including active) hits 110 min (10 min remaining before 120 limit)
-  const d=getToday();
-  const entLogged=entTotalDay(d);
-  const entActiveExtra=ENT_TYPES.reduce((sum,t)=>{const a=S.active['ent_'+t];return sum+(a?Math.floor(elMin(a.start)):0);},0);
-  const entTotal=entLogged+entActiveExtra;
-  const dayKey=tk();
-  if(!_entWarn10Sent||_entWarn10Sent!==dayKey){_entWarn10Sent=false;}
-  if(entTotal>=110&&entTotal<120&&!_entWarn10Sent){
-    _entWarn10Sent=dayKey;
-    if(getNotifPref('ent'))sendNotif('⚠️ Entertainment Limit','Only 10 minutes of entertainment remaining today! Finish up 🎮','owlf-ent-warn');
-  }
-  if(entTotal>=120&&_entWarn10Sent!=='over-'+dayKey){
-    _entWarn10Sent='over-'+dayKey;
-    if(getNotifPref('ent'))sendNotif('🚨 Entertainment Over Limit','You\'ve exceeded your 2h entertainment limit today.','owlf-ent-over');
-  }
-},1000);
+ 
 
 // ═══ REPORTS ═══
 

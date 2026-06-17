@@ -150,9 +150,15 @@ async function restoreFromFirestore(){
         d.design=recalc.design;d.games=recalc.games;d.clients=recalc.clients;
       }
     });
-    save();
+      save();
+  if(document.readyState==='complete'||document.readyState==='interactive'){
     updateWorkUI();updateLifeUI();updateExUI();renderReport();
-    console.log('Firestore restore done');
+  } else {
+    document.addEventListener('DOMContentLoaded',()=>{
+      updateWorkUI();updateLifeUI();updateExUI();renderReport();
+    });
+  }
+  console.log('Firestore restore done');
     
   }catch(e){console.warn('Firestore restore failed:',e);}
 }

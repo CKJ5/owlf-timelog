@@ -2347,6 +2347,7 @@ function updateWorkUI(){
     }
   }
   document.getElementById('dt-type').textContent=d.type||'—';
+  document.getElementById('dt-plan').textContent=d.plan||'—';
   const wt=(d.design||0)+(d.games||0)+(d.clients||0);
   document.getElementById('work-pbar').style.width=Math.min(100,(wt/S.workMin)*100)+'%';
   document.getElementById('work-today-txt').textContent=fmt(wt)+' today';

@@ -98,7 +98,6 @@ async function syncToFirestore(){
 }
 
   
-// Push S.active immediately after any stop action
 async function syncActiveToFirestore(){
   if(!_uid)return;
   try{
@@ -108,8 +107,7 @@ async function syncActiveToFirestore(){
     });
   }catch(e){console.warn('Active sync failed:',e);}
 }
- 
-// Pull S.active from Firestore — called on app focus + sign-in
+
 async function pullActiveFromFirestore(){
   if(!_uid)return;
   try{
@@ -118,13 +116,15 @@ async function pullActiveFromFirestore(){
     const remoteActive=doc.data().active||{};
     const localActive=S.active||{};
     let changed=false;
-    // Adopt sessions started on another device
     Object.keys(remoteActive).forEach(k=>{
       if(!localActive[k]){localActive[k]=remoteActive[k];changed=true;}
     });
-    // Remove sessions stopped on another device
+    const remoteTs=(doc.data()._ts?.seconds||0)*1000;
     Object.keys(localActive).forEach(k=>{
-      if(!remoteActive[k]){delete localActive[k];changed=true;}
+      if(!remoteActive[k]){
+        const sessionStart=localActive[k]?.start||Date.now();
+        if(remoteTs>sessionStart){delete localActive[k];changed=true;}
+      }
     });
     if(changed){
       S.active=localActive;
@@ -134,7 +134,6 @@ async function pullActiveFromFirestore(){
     }
   }catch(e){console.warn('Active pull failed:',e);}
 }
- 
  
 
 // Restore all days from Firestore on login

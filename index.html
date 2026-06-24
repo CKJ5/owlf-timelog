@@ -116,16 +116,17 @@ async function pullActiveFromFirestore(){
     const remoteActive=doc.data().active||{};
     const localActive=S.active||{};
     let changed=false;
-    Object.keys(remoteActive).forEach(k=>{
-      if(!localActive[k]){localActive[k]=remoteActive[k];changed=true;}
-    });
+      Object.keys(remoteActive).forEach(k=>{
+        if(!localActive[k]){localActive[k]=remoteActive[k];changed=true;}
+      });
     const remoteTs=(doc.data()._ts?.seconds||0)*1000;
-    Object.keys(localActive).forEach(k=>{
-      if(!remoteActive[k]){
-        const sessionStart=localActive[k]?.start||Date.now();
-        if(remoteTs>sessionStart){delete localActive[k];changed=true;}
-      }
-    });
+    // Adopt sessions started on another device
+Object.keys(remoteActive).forEach(k=>{
+  if(!localActive[k]){
+    localActive[k]={...remoteActive[k], _foreign:true};  // ← mark it
+    changed=true;
+  }
+});
     if(changed){
       S.active=localActive;
       save();
@@ -1996,10 +1997,13 @@ function startWork(type){
   if(ptype&&!(S.projectTypes||[]).includes(ptype)){if(!S.projectTypes)S.projectTypes=[];S.projectTypes.push(ptype);}
   addRecentSession(ptype,proj);
   S.active['w_'+type]={start:nowTs(),proj,ptype};save();closeModal();updateWorkUI();
+  syncActiveToFirestore(); 
 }
 function stopWork(type,startTs){
-  if(!S.active['w_'+type]){closeModal();return;}  // guard
-  const el=elMin(startTs),wst=parseFloat(document.getElementById('w-wst')?.value)||0,net=Math.max(0,el-wst);
+  if(!S.active['w_'+type]){closeModal();return;}
+  const actualStart=S.active['w_'+type].start||startTs;  // ← use stored start
+  const el=elMin(actualStart),wst=parseFloat(document.getElementById('w-wst')?.value)||0,net=Math.max(0,el-wst);
+  
   const d=getToday();d[type]=(d[type]||0)+net;if(!d.wasted)d.wasted={design:0,games:0,clients:0};d.wasted[type]=(d.wasted[type]||0)+wst;
   const proj=S.active['w_'+type]?.proj||'';
   if(!S.sessions)S.sessions={};
@@ -2035,6 +2039,7 @@ function toggleSnake(){
     syncActiveToFirestore();
   } else {
     S.active['snake']={start:nowTs()};save();updateWorkUI();
+    syncActiveToFirestore();  // ← add
   }
 }
  
@@ -2196,6 +2201,8 @@ function startEnt(type){
   const nameKey='ent'+entCap(type)+'Names';
   if(name)d[nameKey]=[...(d[nameKey]||[]),name];
   S.active['ent_'+type]={start:nowTs(),name};save();closeModal();updateLifeUI();
+  syncActiveToFirestore();  // ← add
+}
 
   // Schedule limit warnings based on already-logged time
   const logged=entTotalDay(getToday());
@@ -2286,6 +2293,7 @@ function togglePrep(type){
     syncActiveToFirestore();
   } else {
     S.active['prep_'+type]={start:nowTs()};save();updateLifeUI();
+    syncActiveToFirestore();
   }
 }
  
@@ -2300,6 +2308,7 @@ function toggleEx(type){
     setTimeout(()=>document.getElementById('ex-inp')?.focus(),80);
   } else {
     S.active['ex_'+type]={start:nowTs()};save();updateExUI();
+    syncActiveToFirestore();
   }
 }
 function saveExToggle(type,startTs){
@@ -2355,6 +2364,7 @@ function toggleCardio(type){
     syncActiveToFirestore();
   } else {
     S.active['cardio_'+type]={start:nowTs()};save();updateExUI();
+    syncActiveToFirestore();
   }
 }
  

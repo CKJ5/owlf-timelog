@@ -2202,7 +2202,7 @@ function startEnt(type){
   if(name)d[nameKey]=[...(d[nameKey]||[]),name];
   S.active['ent_'+type]={start:nowTs(),name};save();closeModal();updateLifeUI();
   syncActiveToFirestore();  // ← add
-}
+
 
   // Schedule limit warnings based on already-logged time
   const logged=entTotalDay(getToday());

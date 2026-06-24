@@ -30,7 +30,9 @@ let _uid=null;
 // ADD to existing visibilitychange listener:
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'){
-    pullActiveFromFirestore();  // ← ADD THIS LINE
+    _lastInteraction=Date.now();      // idle detection line
+    pullActiveFromFirestore();         // active sync line
+    _checkIdle();                      // idle detection line
   }
 });
  

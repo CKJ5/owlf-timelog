@@ -4965,6 +4965,17 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('page-container').style.width=(4*100)+'%';
   document.querySelectorAll('.page').forEach(p=>p.style.width='25%');
 });
+
+  function calcCleanStreak(){
+  let s=0;let cur=new Date();
+  for(let i=0;i<365;i++){
+    const k=cur.toISOString().slice(0,10);const dd=S.daily[k];
+    if(!dd){if(k===tk())s++;cur.setDate(cur.getDate()-1);continue;}
+    if(!dd.hadFire)s++;else if(k!==tk())break;
+    cur.setDate(cur.getDate()-1);
+  }
+  return s;
+}
   
 </script>
 

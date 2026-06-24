@@ -26,16 +26,28 @@ const db=firebase.firestore();
 const auth=firebase.auth();
 let _uid=null;
 
+
+// ADD to existing visibilitychange listener:
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){
+    pullActiveFromFirestore();  // ← ADD THIS LINE
+  }
+});
+ 
+// FIND auth.onAuthStateChanged in <head>, ADD pull call:
 auth.onAuthStateChanged(user=>{
   if(user){
     _uid=user.uid;
     updateFirebaseUI(user);
     restoreFromFirestore();
+    pullActiveFromFirestore();  // ← ADD THIS LINE
   } else {
     _uid=null;
     updateFirebaseUI(null);
   }
 });
+ 
+ 
 
 function signInGoogle(){
   const provider=new firebase.auth.GoogleAuthProvider();
@@ -82,6 +94,46 @@ async function syncToFirestore(){
     if(lbl)lbl.textContent='☁ '+new Date().toLocaleTimeString();
   }catch(e){console.warn('Firestore sync failed:',e);}
 }
+
+  
+// Push S.active immediately after any stop action
+async function syncActiveToFirestore(){
+  if(!_uid)return;
+  try{
+    await db.doc(`users/${_uid}/meta/active`).set({
+      active:S.active||{},
+      _ts:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }catch(e){console.warn('Active sync failed:',e);}
+}
+ 
+// Pull S.active from Firestore — called on app focus + sign-in
+async function pullActiveFromFirestore(){
+  if(!_uid)return;
+  try{
+    const doc=await db.doc(`users/${_uid}/meta/active`).get();
+    if(!doc.exists)return;
+    const remoteActive=doc.data().active||{};
+    const localActive=S.active||{};
+    let changed=false;
+    // Adopt sessions started on another device
+    Object.keys(remoteActive).forEach(k=>{
+      if(!localActive[k]){localActive[k]=remoteActive[k];changed=true;}
+    });
+    // Remove sessions stopped on another device
+    Object.keys(localActive).forEach(k=>{
+      if(!remoteActive[k]){delete localActive[k];changed=true;}
+    });
+    if(changed){
+      S.active=localActive;
+      save();
+      updateWorkUI();updateLifeUI();updateExUI();
+      updateActiveNotifications();
+    }
+  }catch(e){console.warn('Active pull failed:',e);}
+}
+ 
+ 
 
 // Restore all days from Firestore on login
 async function restoreFromFirestore(){
@@ -1945,6 +1997,7 @@ function startWork(type){
   S.active['w_'+type]={start:nowTs(),proj,ptype};save();closeModal();updateWorkUI();
 }
 function stopWork(type,startTs){
+  if(!S.active['w_'+type]){closeModal();return;}  // guard
   const el=elMin(startTs),wst=parseFloat(document.getElementById('w-wst')?.value)||0,net=Math.max(0,el-wst);
   const d=getToday();d[type]=(d[type]||0)+net;if(!d.wasted)d.wasted={design:0,games:0,clients:0};d.wasted[type]=(d.wasted[type]||0)+wst;
   const proj=S.active['w_'+type]?.proj||'';
@@ -1953,9 +2006,12 @@ function stopWork(type,startTs){
   const ptype=S.active['w_'+type]?.ptype||'';
   S.sessions[tk()].push({type,proj,ptype,dur:net,wasted:wst,ts:new Date().toISOString()});
   delete S.active['w_'+type];
-if(window._swReg?.active)window._swReg.active.postMessage({type:'CLEAR',tag:'owlf-work'});
-save();closeModal();calcWorkStreak();updateWorkUI();
+  if(window._swReg?.active)window._swReg.active.postMessage({type:'CLEAR',tag:'owlf-work'});
+  save();closeModal();calcWorkStreak();updateWorkUI();
+  syncActiveToFirestore();
 }
+
+  
 function calcWorkStreak(){
   let s=0;let cur=new Date();
   for(let i=0;i<365;i++){
@@ -1970,12 +2026,17 @@ function calcWorkStreak(){
 // ═══ SNAKE ═══
 function toggleSnake(){
   const a=S.active['snake'];
-  if(a){const el=Math.round(elMin(a.start));const d=getToday();
-        d.snakeDur=(d.snakeDur||0)+el;d.snakeSessions=(d.snakeSessions||0)+1;
-if(!d.snakeLog)d.snakeLog=[];d.snakeLog.push({dur:el,end:nowTs()});
-        delete S.active['snake'];save();updateWorkUI();}
-  else{S.active['snake']={start:nowTs()};save();updateWorkUI();}
+  if(a){
+    const el=Math.round(elMin(a.start));const d=getToday();
+    d.snakeDur=(d.snakeDur||0)+el;d.snakeSessions=(d.snakeSessions||0)+1;
+    if(!d.snakeLog)d.snakeLog=[];d.snakeLog.push({dur:el,end:nowTs()});
+    delete S.active['snake'];save();updateWorkUI();
+    syncActiveToFirestore();
+  } else {
+    S.active['snake']={start:nowTs()};save();updateWorkUI();
+  }
 }
+ 
 
 // ═══ SLEEP / WAKE (yesterday sleep → today wake) ═══
 function logSleepWake(type){
@@ -2120,13 +2181,14 @@ function toggleEnt(type){
     d['ent'+cap+'Sessions']=(d['ent'+cap+'Sessions']||0)+1;
     if(!d['ent'+cap+'Log'])d['ent'+cap+'Log']=[];
     if(el>0)d['ent'+cap+'Log'].push({dur:el,end:nowTs()});
-    
     delete S.active['ent_'+type];save();updateLifeUI();
+    syncActiveToFirestore();
   } else {
     const icons={play:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'};
     showModal(`<h3 style="color:var(--life)">${icons[type]} ${entCap(type)}</h3><label class="mlbl">Name</label><input type="text" id="ent-nm" placeholder="${type==='play'?'Play name':'Show / place name'}..." style="border-color:var(--life)"><div class="mbtns"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf blife" onclick="startEnt('${type}')">Start</button></div>`,null);
   }
 }
+ 
 function startEnt(type){
   const name=(document.getElementById('ent-nm')?.value||'').trim();
   const d=getToday();
@@ -2167,25 +2229,19 @@ function startEnt(type){
 // ═══ FIRE ═══
 function triggerFire(){
   const a=S.active['fire'];
-  if(a){const el=Math.round(elMin(a.start));const d=getToday();d.fireDur=(d.fireDur||0)+el;
-        d.fireCount=(d.fireCount||0)+1;
-if(!d.fireLog)d.fireLog=[];d.fireLog.push({dur:el,end:nowTs()});
-delete S.active['fire'];
-        save();updateLifeUI();return;}
+  if(a){
+    const el=Math.round(elMin(a.start));const d=getToday();
+    d.fireDur=(d.fireDur||0)+el;
+    d.fireCount=(d.fireCount||0)+1;
+    if(!d.fireLog)d.fireLog=[];d.fireLog.push({dur:el,end:nowTs()});
+    delete S.active['fire'];
+    save();updateLifeUI();
+    syncActiveToFirestore();
+    return;
+  }
   showModal(`<div style="text-align:center;font-size:38px;margin-bottom:8px">🧘</div><h3 style="color:var(--fire-c);text-align:center">Warning!</h3><p style="color:var(--muted);font-size:14px;margin:0 0 18px;text-align:center;line-height:1.6">Starting a meditation session breaks your clean streak. Are you sure?</p><div class="mbtns"><button class="bcanc" onclick="praiseFire()">No — Stay Strong</button><button class="bconf bwarn" onclick="startFire()">Yes 🧘</button></div>`,null);
 }
-function praiseFire(){closeModal();showModal(`<div style="text-align:center;font-size:38px;margin-bottom:8px">💪</div><h3 style="color:#13b5a6;text-align:center">Legend!</h3><p style="color:var(--muted);font-size:14px;text-align:center;line-height:1.6;margin-bottom:16px">Clean streak continues!</p><div class="mbtns"><button class="bconf bex" onclick="closeModal()">Hell yeah!</button></div>`,null);}
-function startFire(){const d=getToday();d.hadFire=true;S.active['fire']={start:nowTs()};S.life.cleanStreak=0;save();closeModal();updateLifeUI();}
-function calcCleanStreak(){
-  let s=0;let cur=new Date();
-  for(let i=0;i<365;i++){
-    const k=cur.toISOString().slice(0,10);const dd=S.daily[k];
-    if(!dd){if(k===tk())s++;cur.setDate(cur.getDate()-1);continue;}
-    if(!dd.hadFire)s++;else if(k!==tk())break;
-    cur.setDate(cur.getDate()-1);
-  }
-  return s;
-}
+ 
 
 // ═══ COLLAPSIBLE CARDS ═══
 const _cardOpen={};
@@ -2226,10 +2282,12 @@ function togglePrep(type){
     if(!d[key+'Log'])d[key+'Log']=[];
     if(el>0)d[key+'Log'].push({dur:el,end:nowTs()});
     delete S.active['prep_'+type];save();updateLifeUI();
+    syncActiveToFirestore();
   } else {
     S.active['prep_'+type]={start:nowTs()};save();updateLifeUI();
   }
 }
+ 
 const EX_LABELS={abs:'腹肌',bicep:'二头',pu:'PushUp',bench:'卧推',jian:'肩',bei:'背'};
 const EX_KEYS=Object.keys(EX_LABELS);
 
@@ -2244,10 +2302,11 @@ function toggleEx(type){
   }
 }
 function saveExToggle(type,startTs){
+  if(!S.active['ex_'+type]){closeModal();return;}  // guard
   const val=(document.getElementById('ex-inp')?.value||'').trim();
   if(!val){
-    // cancelled — still stop timer
-    delete S.active['ex_'+type];save();closeModal();updateExUI();return;
+    delete S.active['ex_'+type];save();closeModal();updateExUI();
+    syncActiveToFirestore();return;
   }
   const sets=val.split('+').map(v=>parseInt(v)||0).filter(v=>v>0);
   const total=sets.reduce((a,b)=>a+b,0);
@@ -2260,7 +2319,9 @@ function saveExToggle(type,startTs){
   d[type+'Log'].push({sets,total,dur,end:nowTs()});
   delete S.active['ex_'+type];
   save();closeModal();checkExTarget();updateExUI();
+  syncActiveToFirestore();
 }
+ 
 function resetEx(){
   if(!confirm('Reset today exercise?'))return;
   const d=getToday();
@@ -2290,11 +2351,12 @@ function toggleCardio(type){
     if(!d['cardio_'+type+'Log'])d['cardio_'+type+'Log']=[];
     if(el>0)d['cardio_'+type+'Log'].push({dur:el,end:nowTs()});
     delete S.active['cardio_'+type];save();updateExUI();
+    syncActiveToFirestore();
   } else {
     S.active['cardio_'+type]={start:nowTs()};save();updateExUI();
   }
 }
-
+ 
   
 // ═══ JOURNAL ═══
 function showJournal(){const ex=S.journals[tk()]||'';document.getElementById('journal-txt').value=ex;document.getElementById('journal-overlay').classList.remove('hidden');}

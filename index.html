@@ -111,22 +111,22 @@ async function syncActiveToFirestore(){
 async function pullActiveFromFirestore(){
   if(!_uid)return;
   try{
-    const doc=await db.doc(`users/${_uid}/meta/active`).get();
+    // Force fetch from server, bypass Firestore cache
+    const doc=await db.doc(`users/${_uid}/meta/active`).get({source:'server'});
     if(!doc.exists)return;
     const remoteActive=doc.data().active||{};
     const localActive=S.active||{};
     let changed=false;
-      Object.keys(remoteActive).forEach(k=>{
-        if(!localActive[k]){localActive[k]=remoteActive[k];changed=true;}
-      });
+    Object.keys(remoteActive).forEach(k=>{
+      if(!localActive[k]){localActive[k]={...remoteActive[k],_foreign:true};changed=true;}
+    });
     const remoteTs=(doc.data()._ts?.seconds||0)*1000;
-    // Adopt sessions started on another device
-Object.keys(remoteActive).forEach(k=>{
-  if(!localActive[k]){
-    localActive[k]={...remoteActive[k], _foreign:true};  // ← mark it
-    changed=true;
-  }
-});
+    Object.keys(localActive).forEach(k=>{
+      if(!remoteActive[k]){
+        const sessionStart=localActive[k]?.start||Date.now();
+        if(remoteTs>sessionStart){delete localActive[k];changed=true;}
+      }
+    });
     if(changed){
       S.active=localActive;
       save();

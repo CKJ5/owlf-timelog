@@ -1,4 +1,4 @@
-const CACHE = 'owlf-v5'; // ← bump this when you deploy
+const CACHE = 'owlf-v6'; // ← bump this when you deploy
 
 self.addEventListener('install', e => {
   self.skipWaiting();

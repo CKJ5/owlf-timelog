@@ -1727,20 +1727,26 @@ function requestNotifPerm(){
   if(Notification.permission==='denied')return Promise.resolve('denied');
   return Notification.requestPermission();
 }
+
+
+  
 function sendNotif(title,body,tag){
   if(!('Notification' in window)||Notification.permission!=='granted')return;
-  // Try SW first (works on Android Chrome with HTTPS/PWA)
-  if(window._swReg&&window._swReg.active){
+  // Try direct notification first (works reliably on all platforms)
+  try{
+    new Notification(title,{body,tag,icon:'./icon-192.png',requireInteraction:false,silent:true});
+    return;
+  }catch(e){}
+  // Fallback to SW (for platforms that require it)
+  if(window._swReg?.active){
     try{
       window._swReg.active.postMessage({type:'NOTIFY',title,body,tag});
-      return;
     }catch(e){}
   }
-  // Fallback: direct Notification (works on desktop Chrome, some mobile)
-  try{
-    new Notification(title,{body,tag,requireInteraction:false,silent:true});
-  }catch(e){}
 }
+
+
+  
 function updateNotifBtnUI(){
   const btn=document.getElementById('notif-perm-btn');
   if(!btn)return;

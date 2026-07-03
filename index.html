@@ -2256,6 +2256,15 @@ function triggerFire(){
   }
   showModal(`<div style="text-align:center;font-size:38px;margin-bottom:8px">🧘</div><h3 style="color:var(--fire-c);text-align:center">Warning!</h3><p style="color:var(--muted);font-size:14px;margin:0 0 18px;text-align:center;line-height:1.6">Starting a meditation session breaks your clean streak. Are you sure?</p><div class="mbtns"><button class="bcanc" onclick="praiseFire()">No — Stay Strong</button><button class="bconf bwarn" onclick="startFire()">Yes 🧘</button></div>`,null);
 }
+
+  function startFire(){
+  const d=getToday();
+  d.hadFire=true;
+  S.active['fire']={start:nowTs()};
+  S.life.cleanStreak=0;
+  save();closeModal();updateLifeUI();
+  syncActiveToFirestore();
+}
  
 
 // ═══ COLLAPSIBLE CARDS ═══

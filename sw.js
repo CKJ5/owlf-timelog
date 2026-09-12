@@ -1,4 +1,4 @@
-const CACHE = 'owlf-v6'; // ← bump this when you deploy
+const CACHE = 'owlf-v7'; // ← bump this when you deploy
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -90,7 +90,21 @@ self.addEventListener('message', e => {
 // FIX 3: Tap notification → open/focus app
 // Also removes the "Tap to copy URL" default behavior
 self.addEventListener('notificationclick', e => {
-  e.notification.close();
+  const notif = e.notification;
+  notif.close();
+
+  // To-do reminder "✓ Done" action — tell the app to complete the to-do,
+  // without necessarily opening/focusing the window.
+  if (e.action === 'done' && notif.tag && notif.tag.startsWith('todo-')) {
+    const id = notif.tag.slice('todo-'.length);
+    e.waitUntil(
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
+        cs.forEach(c => c.postMessage({ type: 'TODO_DONE', id }));
+      })
+    );
+    return;
+  }
+
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
       for (const c of cs) {

@@ -513,6 +513,15 @@ body.light .ent-btn.act-life{box-shadow:0 3px 18px rgba(238,73,150,.28)}
 .chip-row::-webkit-scrollbar{display:none}
 .chip{padding:5px 11px;border-radius:14px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0}
 .chip-sel{border-color:var(--ex);background:rgba(19,181,166,.14);color:var(--ex)}
+@keyframes levelUpIn{0%{transform:translate(-50%,-40%) scale(.4);opacity:0}55%{transform:translate(-50%,-50%) scale(1.1);opacity:1}75%{transform:translate(-50%,-50%) scale(.96)}100%{transform:translate(-50%,-50%) scale(1)}}
+@keyframes levelUpOut{0%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-62%) scale(.85)}}
+@keyframes levelUpShine{0%{background-position:-140% 0}100%{background-position:240% 0}}
+.levelup-toast{position:fixed;top:34%;left:50%;transform:translate(-50%,-50%);z-index:9999;min-width:220px;background:linear-gradient(135deg,var(--ex),#0d8377);color:#fff;padding:18px 28px;border-radius:18px;box-shadow:0 12px 44px rgba(19,181,166,.5),0 0 0 3px rgba(255,255,255,.16) inset;text-align:center;font-family:'Rajdhani',sans-serif;pointer-events:none;animation:levelUpIn .5s cubic-bezier(.34,1.56,.64,1) forwards;overflow:hidden}
+.levelup-toast.out{animation:levelUpOut .4s ease-in forwards}
+.levelup-toast::after{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent 40%,rgba(255,255,255,.35) 50%,transparent 60%);background-size:200% 100%;animation:levelUpShine 1.1s ease-out .15s 1}
+.levelup-badge{font-size:11px;letter-spacing:3px;font-weight:800;opacity:.85;margin-bottom:5px;text-transform:uppercase}
+.levelup-title{font-size:22px;font-weight:800;margin-bottom:3px;letter-spacing:.5px}
+.levelup-sub{font-size:14px;font-weight:700;opacity:.95}
 .chip.active{background:var(--bg4);border-color:var(--text);color:var(--text)}
 .rtab-row{display:flex;background:var(--bg3);border-radius:10px;padding:3px;margin-bottom:12px;border:1px solid var(--border);gap:2px}
 .rtab{flex:1;padding:8px 4px;border:none;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;border-radius:8px;cursor:pointer;background:transparent;color:var(--muted);transition:all .2s}
@@ -1639,6 +1648,7 @@ function loadS(){
   if(!S.ratioSelections)S.ratioSelections={};
   if(!S.recentSessions)S.recentSessions=[];
   if(!S.todos)S.todos=[];
+  if(!S.lastExSets)S.lastExSets={};
 }
 
 
@@ -2473,12 +2483,33 @@ function toggleEx(type){
   if(a){
     const el=Math.round(elMin(a.start));
     const lastW=(S.lastExWeight&&S.lastExWeight[type]!=null)?S.lastExWeight[type]:'';
-    showModal(`<h3 style="color:var(--ex)">${EX_LABELS[type]}</h3><p style="color:var(--muted);font-size:13px;margin-bottom:10px">Time: ${fmtSec(elSec(a.start))}</p><label class="mlbl">Times (sets e.g. 15+15)</label><input type="text" id="ex-inp" placeholder="e.g. 20 or 15+15" style="border-color:var(--ex)" autofocus><label class="mlbl" style="margin-top:10px">Weight (kg, optional)</label><input type="number" id="ex-w-inp" placeholder="e.g. 20" step="0.5" min="0" value="${lastW}" style="border-color:var(--ex)"><div class="mbtns" style="margin-top:6px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf bex" onclick="saveExToggle('${type}',${a.start})">Done</button></div>`,null);
+    const lastSets=(S.lastExSets&&S.lastExSets[type])||'';
+    const repsPh=lastSets?`e.g. 20 or 15+15 (last: ${lastSets})`:'e.g. 20 or 15+15';
+    showModal(`<h3 style="color:var(--ex)">${EX_LABELS[type]}</h3><p style="color:var(--muted);font-size:13px;margin-bottom:10px">Time: ${fmtSec(elSec(a.start))}</p><label class="mlbl">Times (sets e.g. 15+15)</label><input type="text" id="ex-inp" placeholder="${repsPh}" style="border-color:var(--ex)" autofocus><label class="mlbl" style="margin-top:10px">Weight (kg, optional)</label><input type="number" id="ex-w-inp" placeholder="e.g. 20" step="0.5" min="0" value="${lastW}" style="border-color:var(--ex)"><div class="mbtns" style="margin-top:6px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf bex" onclick="saveExToggle('${type}',${a.start})">Done</button></div>`,null);
     setTimeout(()=>document.getElementById('ex-inp')?.focus(),80);
   } else {
+    const lastSets=(S.lastExSets&&S.lastExSets[type])||'';
+    const lastW=(S.lastExWeight&&S.lastExWeight[type]!=null)?S.lastExWeight[type]:'';
+    if(lastSets||lastW!=='')showLevelUpToast(type,lastSets,lastW);
     S.active['ex_'+type]={start:nowTs()};save();updateExUI();
     syncActiveToFirestore();
   }
+}
+// Level-up style popup showing your last reps/weight for this exercise, right as you start
+function showLevelUpToast(type,lastSets,lastW){
+  const label=EX_LABELS[type]||type;
+  const parts=[];
+  if(lastSets)parts.push(lastSets+' reps');
+  if(lastW!==''&&lastW!=null)parts.push(lastW+'kg');
+  const sub=parts.length?parts.join(' @ '):"Let's go!";
+  const el=document.createElement('div');
+  el.className='levelup-toast';
+  el.innerHTML=`<div class="levelup-badge">⚡ Last time</div><div class="levelup-title">${label}</div><div class="levelup-sub">${sub}</div>`;
+  document.body.appendChild(el);
+  setTimeout(()=>{
+    el.classList.add('out');
+    setTimeout(()=>el.remove(),420);
+  },2000);
 }
 function saveExToggle(type,startTs){
   if(!S.active['ex_'+type]){closeModal();return;}  // guard
@@ -2499,6 +2530,7 @@ function saveExToggle(type,startTs){
   if(!d[type+'Log'])d[type+'Log']=[];
   d[type+'Log'].push({sets,total,dur,weight,end:nowTs()});
   if(weight!=null){if(!S.lastExWeight)S.lastExWeight={};S.lastExWeight[type]=weight;}
+  if(!S.lastExSets)S.lastExSets={};S.lastExSets[type]=val;
   delete S.active['ex_'+type];
   save();closeModal();checkExTarget();updateExUI();
   syncActiveToFirestore();
@@ -2562,7 +2594,9 @@ function renderTodos(){
   `).join('');
 }
 function showAddTodo(){
-  showModal(`<h3 style="color:var(--life)">📝 New To-Do</h3><label class="mlbl">What do you need to do?</label><input type="text" id="todo-inp-text" placeholder="e.g. Call the dentist" style="border-color:var(--life)" autofocus><label class="mlbl" style="margin-top:10px">Remind me at (optional)</label><input type="time" id="todo-inp-time" style="border-color:var(--life)"><div class="mbtns" style="margin-top:14px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" style="background:var(--life)" onclick="saveNewTodo()">Add</button></div>`,null);
+  const permWarn=(('Notification' in window)&&Notification.permission!=='granted')
+    ?`<p style="font-size:11px;color:var(--warn,#e0a030);margin:8px 0 0;line-height:1.5">⚠️ Notifications aren't enabled yet — you'll be asked to allow them when you save a reminder time.</p>`:'';
+  showModal(`<h3 style="color:var(--life)">📝 New To-Do</h3><label class="mlbl">What do you need to do?</label><input type="text" id="todo-inp-text" placeholder="e.g. Call the dentist" style="border-color:var(--life)" autofocus><label class="mlbl" style="margin-top:10px">Remind me at (optional)</label><input type="time" id="todo-inp-time" style="border-color:var(--life)">${permWarn}<div class="mbtns" style="margin-top:14px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" style="background:var(--life)" onclick="saveNewTodo()">Add</button></div>`,null);
   setTimeout(()=>document.getElementById('todo-inp-text')?.focus(),80);
 }
 function saveNewTodo(){
@@ -2572,6 +2606,13 @@ function saveNewTodo(){
   if(!S.todos)S.todos=[];
   S.todos.push({id:uid(),text,time,done:false,notified:false,created:new Date().toISOString()});
   save();closeModal();renderTodos();
+  if(time&&('Notification' in window)&&Notification.permission==='default'){
+    requestNotifPerm().then(perm=>{
+      if(perm!=='granted')alert('Reminder saved, but notifications are off — go to Settings to enable them or this reminder won\'t alert you.');
+    });
+  } else if(time&&('Notification' in window)&&Notification.permission==='denied'){
+    alert('Reminder saved, but notifications are blocked in your browser settings — this reminder won\'t alert you until you allow them.');
+  }
 }
 function completeTodo(id){
   if(!S.todos)return;
@@ -2614,6 +2655,7 @@ function checkTodoReminders(){
   if(changed)save();
 }
 setInterval(checkTodoReminders,20000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkTodoReminders();});
 // Tapping "✓ Done" on the OS notification completes the to-do here too
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message',e=>{

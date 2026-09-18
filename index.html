@@ -3794,15 +3794,7 @@ function buildDailyCompact(dateKey){
       ['Meditation',d.hadFire?'Yes ×'+(d.fireCount||0)+' ('+fmt(d.fireDur||0)+')':'Clean ✓', d.hadFire?'#ff4444':'#13b5a6'],
     ]),
     
-    compactSecFiltered('🛠 Preparation','var(--ex)',[
-      ['Total',fmt(prepTotalDay(d)),'var(--ex)'],
-      ['🍳 Cook',fmtLog(d.prepCookLog)],
-      ['🍱 Meal',fmtLog(d.prepMealLog)],
-      ['🚗 Drive',fmtLog(d.prepTransportLog)],
-      ['⚽ Sport',fmtLog(d.prepSportLog)],
-      ['🚿 Shower',fmtLog(d.prepShowerLog)],
-      ['📦 Other',fmtLog(d.prepOtherLog)],
-    ]),
+    buildPrepSection(d,dateKey),
     compactSecFiltered('💪 Exercise','var(--ex)',[
       ['Total',d.exTotal||0,'var(--ex)'],
       ...EX_KEYS.map(t=>[EX_LABELS[t], String(d[t]||0)+((d[t+'Sets']&&d[t+'Sets'].length)?' ('+d[t+'Sets'].join('+')+')'  : '')])
@@ -3815,6 +3807,74 @@ function buildDailyCompact(dateKey){
     emrg.length?compactSec('🚨 Emergency','#c0392b',emrg.map(e=>[new Date(e.ts).toLocaleTimeString(),e.text,'#c0392b'])):'',
     `<button class="emr-btn" onclick="logEmergency('${dateKey}')">🚨 Emergency Log</button>`
   ].join('');
+}
+
+// ═══ REPORT: PREPARATION (expandable per-type drawers) ═══
+function prepEntryName(type,e){
+  if(!e||typeof e!=='object')return '';
+  if(type==='transport')return e.mode||'—';
+  if(type==='meal'){
+    const bits=[];
+    if(e.note)bits.push(e.note);
+    if(e.kcal!=null)bits.push(e.kcal+' kcal');
+    return bits.join(' · ')||'—';
+  }
+  if(type==='sport'){
+    let s=e.note||'—';
+    if(e.friends)s+=' · w/ '+e.friends;
+    return s;
+  }
+  return e.note||'—';
+}
+function buildPrepSection(d,dateKey){
+  if(!d)return'';
+  const total=prepTotalDay(d);
+  if(!total)return'';
+  const rows=PREP_TYPES.map(type=>{
+    const key='prep'+entCap(type);
+    const mins=d[key]||0;
+    const log=(d[key+'Log']||[]).filter(e=>e&&typeof e==='object');
+    if(!mins&&!log.length)return'';
+    const did='pd-'+dateKey.replace(/-/g,'')+'-'+type;
+    const hasDetail=log.length>0;
+    const inner=log.map(e=>{
+      const t=e.end?new Date(e.end):null;
+      const clock=t?pad(t.getHours())+':'+pad(t.getMinutes()):'—';
+      const name=prepEntryName(type,e);
+      return`<div style="display:flex;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;border-left:3px solid var(--ex);background:var(--bg2);margin-top:3px">
+        <span style="font-size:10px;color:var(--muted);min-width:42px">${clock}</span>
+        <span style="font-size:11px;color:var(--text);flex:1;word-break:break-word">${escapeHtml(name)}</span>
+        <span style="font-size:10px;color:var(--muted)">${fmt(e.dur||0)}</span>
+      </div>`;
+    }).join('');
+    return`<div>
+      <div ${hasDetail?`onclick="prepDrawer('${did}')" style="cursor:pointer;user-select:none;"`:'style="cursor:default"'} class="compact-row">
+        <span style="color:var(--muted);font-size:12px">${PREP_ICONS[type]} ${PREP_LABELS[type]}${hasDetail?` <span id="${did}-arr" style="font-size:10px">▾</span>`:''}</span>
+        <span class="compact-val" style="color:var(--text)">${fmt(mins)}</span>
+      </div>
+      ${hasDetail?`<div id="${did}" style="overflow:hidden;max-height:0;transition:max-height .28s ease">${inner}</div>`:''}
+    </div>`;
+  }).filter(Boolean).join('');
+  if(!rows)return'';
+  return`<div class="compact-section">
+    <div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--ex);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:5px">🛠 Preparation</div>
+    <div class="compact-row"><span style="color:var(--muted);font-size:12px">Total</span><span class="compact-val" style="color:var(--ex)">${fmt(total)}</span></div>
+    ${rows}
+  </div>`;
+}
+function prepDrawer(id){
+  const det=document.getElementById(id);
+  const arr=document.getElementById(id+'-arr');
+  if(!det)return;
+  const open=det.style.maxHeight!=='0px'&&det.style.maxHeight!=='';
+  if(open){
+    det.style.maxHeight='0px';
+    if(arr)arr.textContent='▾';
+  } else {
+    det.style.maxHeight=det.scrollHeight+'px';
+    setTimeout(()=>{if(det.style.maxHeight!=='0px')det.style.maxHeight='none';},350);
+    if(arr)arr.textContent='▴';
+  }
 }
 
 function buildTimeline(dateKey){
@@ -4126,8 +4186,8 @@ function rebuildGridRows(uid,dateKey,startMin,totalMin,isFull){
   }
   
   
-  const hrs=isFull?[0,4,8,12,16,20,23]:[Math.floor(startMin/60),Math.floor(startMin/60)+3,Math.floor(startMin/60)+6];
-  const tlHtml=hrs.map(h=>{const pct=((h*60-startMin)/totalMin*100);if(pct<0||pct>98)return'';return`<div style="position:absolute;left:${pct.toFixed(1)}%;font-size:9px;color:var(--muted);transform:translateX(-50%)">${pad(h)}:00</div>`;}).join('');
+  const hrs=isFull?[1,4,8,12,16,20,23]:[Math.floor(startMin/60)+1,Math.floor(startMin/60)+3,Math.floor(startMin/60)+6];
+  const tlHtml=hrs.map(h=>{if(h<=0||h>=24)return'';const pct=((h*60-startMin)/totalMin*100);if(pct<2||pct>97)return'';return`<div style="position:absolute;left:${pct.toFixed(1)}%;font-size:9px;color:var(--muted);transform:translateX(-50%);white-space:nowrap">${pad(h)}:00</div>`;}).join('');
   return catRow('work')+catRow('prep')+catRow('ent')+catRow('snake')+catRow('med')+sleepRow+`<div style="position:relative;height:14px">${tlHtml}</div>`;
 }
 

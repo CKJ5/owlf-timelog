@@ -1,5 +1,3 @@
-  
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -522,6 +520,12 @@ body.light .ent-btn.act-life{box-shadow:0 3px 18px rgba(238,73,150,.28)}
 .levelup-badge{font-size:11px;letter-spacing:3px;font-weight:800;opacity:.85;margin-bottom:5px;text-transform:uppercase}
 .levelup-title{font-size:22px;font-weight:800;margin-bottom:3px;letter-spacing:.5px}
 .levelup-sub{font-size:14px;font-weight:700;opacity:.95}
+.ai-task-btn{display:flex;justify-content:space-between;align-items:center;width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid var(--border);background:var(--bg3);cursor:pointer;font-family:'Rajdhani',sans-serif;text-align:left;transition:opacity .3s,border-color .3s,box-shadow .3s,filter .3s}
+.ai-task-btn.ai-cooling{opacity:.5;filter:grayscale(.7);box-shadow:none;animation:none}
+.ai-task-btn.ai-ready{border-color:var(--work);background:linear-gradient(135deg,rgba(223,182,126,.18),rgba(223,182,126,.05));box-shadow:0 0 0 1px rgba(223,182,126,.3),0 4px 18px rgba(223,182,126,.25);animation:aiPulse 2.4s ease-in-out infinite}
+@keyframes aiPulse{0%,100%{box-shadow:0 0 0 1px rgba(223,182,126,.3),0 4px 16px rgba(223,182,126,.22)}50%{box-shadow:0 0 0 1px rgba(223,182,126,.55),0 4px 30px rgba(223,182,126,.5)}}
+.ai-add-btn{display:flex;align-items:center;justify-content:center;width:100%;padding:13px;border-radius:12px;border:2px dashed var(--border);background:transparent;color:var(--muted);font-size:22px;font-weight:800;line-height:1;cursor:pointer;font-family:'Rajdhani',sans-serif;transition:border-color .2s,color .2s}
+.ai-add-btn:hover{border-color:var(--work);color:var(--work)}
 .chip.active{background:var(--bg4);border-color:var(--text);color:var(--text)}
 .rtab-row{display:flex;background:var(--bg3);border-radius:10px;padding:3px;margin-bottom:12px;border:1px solid var(--border);gap:2px}
 .rtab{flex:1;padding:8px 4px;border:none;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;border-radius:8px;cursor:pointer;background:transparent;color:var(--muted);transition:all .2s}
@@ -1070,6 +1074,26 @@ function installPWA(){
     </div>
     <!-- any other stats rows inside the card go here -->
     
+  </div>
+</div>
+
+<div class="card" id="ai-card">
+  <div class="card-hdr card-hdr-btn" onclick="toggleCardCollapse('ai-body','ai-collapse-arrow','ai-hdr-lbl')">
+    <span class="card-lbl" id="ai-hdr-lbl" style="color:var(--work)">Ai</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span id="ai-collapse-arrow" style="font-size:12px;color:var(--muted)">▾</span>
+    </div>
+  </div>
+  <div id="ai-task-list" style="display:flex;flex-direction:column;gap:8px;padding:2px 14px 12px"></div>
+  <div class="card-collapse-body" id="ai-body" style="max-height:0px">
+    <div class="sr2">
+      <div class="sbox"><div class="snum" style="color:var(--work)" id="ai-ct-today">0</div><div class="slbl">Today Times</div></div>
+      <div class="sbox"><div class="snum" style="color:var(--work)" id="ai-tasks-today">0</div><div class="slbl">Tasks Used</div></div>
+    </div>
+    <div class="sr3">
+      <div class="sbox"><div class="snum" style="color:var(--work)" id="ai-ct-mo">0</div><div class="slbl">Mo. Times</div></div>
+      <div class="sbox"><div class="snum" style="color:var(--work)" id="ai-avg-mo">0</div><div class="slbl">Mo. Avg/Day</div></div>
+    </div>
   </div>
 </div>
 </div>
@@ -1649,6 +1673,7 @@ function loadS(){
   if(!S.recentSessions)S.recentSessions=[];
   if(!S.todos)S.todos=[];
   if(!S.lastExSets)S.lastExSets={};
+  if(!S.aiTasks)S.aiTasks=[];
 }
 
 
@@ -2137,6 +2162,86 @@ function toggleSnake(){
   }
 }
  
+
+// ═══ AI TASKS (repeat-daily to-do list with cooldowns) ═══
+function fmtCountdown(ms){
+  if(ms<=0)return'Ready';
+  const totalMin=Math.ceil(ms/60000);
+  const h=Math.floor(totalMin/60),m=totalMin%60;
+  return h>0?(h+'h '+m+'m left'):(m+'m left');
+}
+function renderAiTasks(){
+  const area=document.getElementById('ai-task-list');
+  if(!area)return;
+  const d=getToday();
+  const now=Date.now();
+  const tasks=S.aiTasks||[];
+  const rows=tasks.map(t=>{
+    const cnt=d['ai_'+t.id]||0;
+    const cooling=t.cooldownUntil&&t.cooldownUntil>now;
+    const stateCls=cooling?'ai-cooling':'ai-ready';
+    const sub=cooling?fmtCountdown(t.cooldownUntil-now):(cnt?cnt+'× today · Ready':'Ready');
+    return `<button class="ai-task-btn ${stateCls}" onclick="toggleAiTask('${t.id}')">
+      <div><div style="color:var(--text);font-weight:700">${escapeHtml(t.name)}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${sub}</div></div>
+      <div style="font-size:18px">${cooling?'⏳':'⚡'}</div>
+    </button>`;
+  }).join('');
+  area.innerHTML=rows+`<button class="ai-add-btn" onclick="showAddAiTask()">+</button>`;
+  const moPrefix=mk();
+  const moKeys=Object.keys(S.daily).filter(k=>k.startsWith(moPrefix));
+  const moCt=moKeys.reduce((s,k)=>s+(S.daily[k].aiTotal||0),0);
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('ai-ct-today',d.aiTotal||0);
+  set('ai-tasks-today',tasks.filter(t=>(d['ai_'+t.id]||0)>0).length);
+  set('ai-ct-mo',moCt);
+  set('ai-avg-mo',moKeys.length?(moCt/moKeys.length).toFixed(1):0);
+}
+function toggleAiTask(id){
+  const task=(S.aiTasks||[]).find(t=>t.id===id);
+  if(!task)return;
+  const d=getToday();
+  d.aiTotal=(d.aiTotal||0)+1;
+  d['ai_'+id]=(d['ai_'+id]||0)+1;
+  if(!d['ai_'+id+'Log'])d['ai_'+id+'Log']=[];
+  d['ai_'+id+'Log'].push({ts:nowTs(),name:task.name});
+  save();renderAiTasks();
+  showAiCooldownModal(id);
+}
+function showAiCooldownModal(id){
+  const task=(S.aiTasks||[]).find(t=>t.id===id);
+  if(!task)return;
+  const lastH=(task.lastCooldownHours!=null)?task.lastCooldownHours:'';
+  showModal(`<h3 style="color:var(--work)">⏱ Cooldown</h3><p style="color:var(--muted);font-size:13px;margin-bottom:10px">How many hours before "${escapeHtml(task.name)}" is ready again?</p><input type="number" id="ai-cd-inp" min="0" step="0.5" placeholder="e.g. 4" value="${lastH}" style="border-color:var(--work)" autofocus><div class="mbtns" style="margin-top:14px"><button class="bcanc" onclick="saveAiCooldown('${id}',0)">No cooldown</button><button class="bconf" style="background:var(--work)" onclick="saveAiCooldown('${id}')">Set</button></div>`,null);
+  setTimeout(()=>document.getElementById('ai-cd-inp')?.focus(),80);
+}
+function saveAiCooldown(id,forceHours){
+  const task=(S.aiTasks||[]).find(t=>t.id===id);
+  let hours=forceHours;
+  if(hours===undefined){
+    const raw=document.getElementById('ai-cd-inp')?.value;
+    hours=(raw!==undefined&&raw!==''&&!isNaN(parseFloat(raw)))?parseFloat(raw):0;
+  }
+  if(task){
+    task.lastCooldownHours=hours;
+    task.cooldownUntil=hours>0?Date.now()+hours*3600*1000:null;
+    const d=getToday();
+    const log=d['ai_'+id+'Log'];
+    if(log&&log.length)log[log.length-1].cooldownHours=hours;
+  }
+  save();closeModal();renderAiTasks();
+}
+function showAddAiTask(){
+  showModal(`<h3 style="color:var(--work)">+ New Task</h3><label class="mlbl">Task name</label><input type="text" id="ai-task-name" placeholder="e.g. Check emails" style="border-color:var(--work)" autofocus><div class="mbtns" style="margin-top:14px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" style="background:var(--work)" onclick="saveNewAiTask()">Add</button></div>`,null);
+  setTimeout(()=>document.getElementById('ai-task-name')?.focus(),80);
+}
+function saveNewAiTask(){
+  const name=(document.getElementById('ai-task-name')?.value||'').trim();
+  if(!name){closeModal();return;}
+  if(!S.aiTasks)S.aiTasks=[];
+  S.aiTasks.push({id:uid(),name,cooldownUntil:null,lastCooldownHours:null,created:new Date().toISOString()});
+  save();closeModal();renderAiTasks();
+}
+setInterval(renderAiTasks,60000); // keep ready/cooling state + countdown fresh
 
 // ═══ SLEEP / WAKE (yesterday sleep → today wake) ═══
 function logSleepWake(type){
@@ -2705,6 +2810,7 @@ function importData(e){
 // ═══ UI UPDATES ═══
 function updateWorkUI(){
   calcWorkStreak();
+  renderAiTasks();
   const d=getToday();
   // Reconcile: if daily totals are 0 but sessions exist, recalculate from sessions
   const todaySessions=S.sessions[tk()]||[];
@@ -3795,6 +3901,7 @@ function buildDailyCompact(dateKey){
     ]),
     
     buildPrepSection(d,dateKey),
+    buildAiSection(d,dateKey),
     compactSecFiltered('💪 Exercise','var(--ex)',[
       ['Total',d.exTotal||0,'var(--ex)'],
       ...EX_KEYS.map(t=>[EX_LABELS[t], String(d[t]||0)+((d[t+'Sets']&&d[t+'Sets'].length)?' ('+d[t+'Sets'].join('+')+')'  : '')])
@@ -3875,6 +3982,43 @@ function prepDrawer(id){
     setTimeout(()=>{if(det.style.maxHeight!=='0px')det.style.maxHeight='none';},350);
     if(arr)arr.textContent='▴';
   }
+}
+
+// ═══ REPORT: AI TASKS (expandable per-task drawers) ═══
+function buildAiSection(d,dateKey){
+  if(!d||!d.aiTotal)return'';
+  const ids=Object.keys(d).filter(k=>k.startsWith('ai_')&&!k.endsWith('Log')).map(k=>k.slice(3));
+  const rows=ids.map(id=>{
+    const cnt=d['ai_'+id]||0;
+    if(!cnt)return'';
+    const log=d['ai_'+id+'Log']||[];
+    const taskDef=(S.aiTasks||[]).find(t=>t.id===id);
+    const name=(log[0]&&log[0].name)||(taskDef&&taskDef.name)||'Task';
+    const did='ad-'+dateKey.replace(/-/g,'')+'-'+id;
+    const inner=log.map(e=>{
+      const t=e.ts?new Date(e.ts):null;
+      const clock=t?pad(t.getHours())+':'+pad(t.getMinutes()):'—';
+      const cd=(e.cooldownHours!=null)?(e.cooldownHours>0?e.cooldownHours+'h cooldown':'no cooldown'):'—';
+      return`<div style="display:flex;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;border-left:3px solid var(--work);background:var(--bg2);margin-top:3px">
+        <span style="font-size:10px;color:var(--muted);min-width:42px">${clock}</span>
+        <span style="font-size:11px;color:var(--text);flex:1;word-break:break-word">${escapeHtml(name)}</span>
+        <span style="font-size:10px;color:var(--muted)">${cd}</span>
+      </div>`;
+    }).join('');
+    return`<div>
+      <div onclick="prepDrawer('${did}')" style="cursor:pointer;user-select:none" class="compact-row">
+        <span style="color:var(--muted);font-size:12px">🤖 ${escapeHtml(name)} <span id="${did}-arr" style="font-size:10px">▾</span></span>
+        <span class="compact-val" style="color:var(--text)">${cnt}×</span>
+      </div>
+      <div id="${did}" style="overflow:hidden;max-height:0;transition:max-height .28s ease">${inner}</div>
+    </div>`;
+  }).filter(Boolean).join('');
+  if(!rows)return'';
+  return`<div class="compact-section">
+    <div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--work);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:5px">🤖 Ai Tasks</div>
+    <div class="compact-row"><span style="color:var(--muted);font-size:12px">Total</span><span class="compact-val" style="color:var(--work)">${d.aiTotal}×</span></div>
+    ${rows}
+  </div>`;
 }
 
 function buildTimeline(dateKey){

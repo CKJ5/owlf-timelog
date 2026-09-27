@@ -2200,13 +2200,16 @@ function renderAiTasks(){
     const cooling=t.cooldownUntil&&t.cooldownUntil>now;
     const stateCls=cooling?'ai-cooling':'ai-ready';
     const sub=cooling?(fmtCooldownTarget(t.cooldownUntil)+' · '+fmtCountdown(t.cooldownUntil-now)):(cnt?cnt+'× today · Ready':'Ready');
-    return `<div style="position:relative">
-      <button class="ai-task-btn ${stateCls}" onclick="toggleAiTask('${t.id}')">
-        <div><div style="color:var(--text);font-weight:700">${escapeHtml(t.name)}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${sub}</div></div>
-        <div style="font-size:18px">${cooling?'⏳':'⚡'}</div>
-      </button>
-      <button onclick="event.stopPropagation();deleteAiTask('${t.id}')" title="Remove task" style="position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(0,0,0,.3);color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">✕</button>
-    </div>`;
+    return `<button class="ai-task-btn ${stateCls}"
+      onpointerdown="aiPressStart('${t.id}',event)"
+      onpointermove="aiPressMove(event)"
+      onpointerup="aiPressEnd()"
+      onpointercancel="aiPressEnd()"
+      onpointerleave="aiPressEnd()"
+      onclick="aiPressClick('${t.id}')">
+      <div><div style="color:var(--text);font-weight:700">${escapeHtml(t.name)}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${sub}</div></div>
+      <div style="font-size:18px">${cooling?'⏳':'⚡'}</div>
+    </button>`;
   }).join('');
   area.innerHTML=rows+`<button class="ai-add-btn" onclick="showAddAiTask()">+</button>`;
   const moPrefix=mk();
@@ -2252,12 +2255,59 @@ function saveAiCooldown(id,skip){
   }
   save();closeModal();renderAiTasks();
 }
-function deleteAiTask(id){
+// Long-press (or click-and-hold) an Ai task button to edit/delete it.
+// A normal tap still toggles it — aiPressClick() swallows the click that
+// immediately follows a fired long-press so it doesn't also toggle.
+let _aiPressTimer=null,_aiPressFired=false,_aiPressXY=null;
+function aiPressStart(id,ev){
+  _aiPressFired=false;
+  const p=ev.touches?ev.touches[0]:ev;
+  _aiPressXY=[p.clientX,p.clientY];
+  clearTimeout(_aiPressTimer);
+  _aiPressTimer=setTimeout(()=>{
+    _aiPressFired=true;
+    if(navigator.vibrate)navigator.vibrate(15);
+    showAiTaskMenu(id);
+  },550);
+}
+function aiPressMove(ev){
+  if(!_aiPressXY)return;
+  const p=ev.touches?ev.touches[0]:ev;
+  if(Math.abs(p.clientX-_aiPressXY[0])>10||Math.abs(p.clientY-_aiPressXY[1])>10)clearTimeout(_aiPressTimer);
+}
+function aiPressEnd(){clearTimeout(_aiPressTimer);}
+function aiPressClick(id){
+  if(_aiPressFired){_aiPressFired=false;return;} // this click followed a long-press — ignore it
+  toggleAiTask(id);
+}
+function showAiTaskMenu(id){
   const task=(S.aiTasks||[]).find(t=>t.id===id);
   if(!task)return;
-  if(!confirm('Remove "'+task.name+'"? Today\'s count and past reports will still keep its history.'))return;
+  showModal(`<h3 style="color:var(--work)">${escapeHtml(task.name)}</h3><div class="mbtns" style="flex-direction:column;gap:8px;margin-top:10px">
+    <button class="bconf" style="background:var(--work);width:100%" onclick="showAiTaskRename('${id}')">✎ Edit Name</button>
+    <button class="bcanc" style="width:100%;border-color:#ff4466;color:#ff4466" onclick="deleteAiTask('${id}')">🗑 Delete</button>
+    <button class="bcanc" style="width:100%" onclick="closeModal()">Cancel</button>
+  </div>`,null);
+}
+function showAiTaskRename(id){
+  const task=(S.aiTasks||[]).find(t=>t.id===id);
+  if(!task)return;
+  showModal(`<h3 style="color:var(--work)">Edit Name</h3><input type="text" id="ai-rename-inp" value="${escapeHtml(task.name)}" style="border-color:var(--work)" autofocus><div class="mbtns" style="margin-top:14px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" style="background:var(--work)" onclick="saveAiTaskRename('${id}')">Save</button></div>`,null);
+  setTimeout(()=>{const el=document.getElementById('ai-rename-inp');if(el){el.focus();el.select();}},80);
+}
+function saveAiTaskRename(id){
+  const task=(S.aiTasks||[]).find(t=>t.id===id);
+  if(!task){closeModal();return;}
+  const name=(document.getElementById('ai-rename-inp')?.value||'').trim();
+  if(name)task.name=name;
+  save();closeModal();renderAiTasks();
+}
+function deleteAiTask(id){
+  const task=(S.aiTasks||[]).find(t=>t.id===id);
+  if(!task){closeModal();return;}
+  if(!confirm('Remove "'+task.name+'"? Today\'s count and past reports will still keep its history.'))return; // keep menu open if cancelled
   S.aiTasks=(S.aiTasks||[]).filter(t=>t.id!==id);
-  save();renderAiTasks();
+  save();closeModal();renderAiTasks();
 }
 function showAddAiTask(){
   showModal(`<h3 style="color:var(--work)">+ New Task</h3><label class="mlbl">Task name</label><input type="text" id="ai-task-name" placeholder="e.g. Check emails" style="border-color:var(--work)" autofocus><div class="mbtns" style="margin-top:14px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" style="background:var(--work)" onclick="saveNewAiTask()">Add</button></div>`,null);

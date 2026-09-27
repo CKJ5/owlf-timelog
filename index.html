@@ -2200,10 +2200,13 @@ function renderAiTasks(){
     const cooling=t.cooldownUntil&&t.cooldownUntil>now;
     const stateCls=cooling?'ai-cooling':'ai-ready';
     const sub=cooling?(fmtCooldownTarget(t.cooldownUntil)+' · '+fmtCountdown(t.cooldownUntil-now)):(cnt?cnt+'× today · Ready':'Ready');
-    return `<button class="ai-task-btn ${stateCls}" onclick="toggleAiTask('${t.id}')">
-      <div><div style="color:var(--text);font-weight:700">${escapeHtml(t.name)}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${sub}</div></div>
-      <div style="font-size:18px">${cooling?'⏳':'⚡'}</div>
-    </button>`;
+    return `<div style="position:relative">
+      <button class="ai-task-btn ${stateCls}" onclick="toggleAiTask('${t.id}')">
+        <div><div style="color:var(--text);font-weight:700">${escapeHtml(t.name)}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${sub}</div></div>
+        <div style="font-size:18px">${cooling?'⏳':'⚡'}</div>
+      </button>
+      <button onclick="event.stopPropagation();deleteAiTask('${t.id}')" title="Remove task" style="position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(0,0,0,.3);color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">✕</button>
+    </div>`;
   }).join('');
   area.innerHTML=rows+`<button class="ai-add-btn" onclick="showAddAiTask()">+</button>`;
   const moPrefix=mk();
@@ -2248,6 +2251,13 @@ function saveAiCooldown(id,skip){
     if(log&&log.length)log[log.length-1].cooldownUntil=targetTs;
   }
   save();closeModal();renderAiTasks();
+}
+function deleteAiTask(id){
+  const task=(S.aiTasks||[]).find(t=>t.id===id);
+  if(!task)return;
+  if(!confirm('Remove "'+task.name+'"? Today\'s count and past reports will still keep its history.'))return;
+  S.aiTasks=(S.aiTasks||[]).filter(t=>t.id!==id);
+  save();renderAiTasks();
 }
 function showAddAiTask(){
   showModal(`<h3 style="color:var(--work)">+ New Task</h3><label class="mlbl">Task name</label><input type="text" id="ai-task-name" placeholder="e.g. Check emails" style="border-color:var(--work)" autofocus><div class="mbtns" style="margin-top:14px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" style="background:var(--work)" onclick="saveNewAiTask()">Add</button></div>`,null);

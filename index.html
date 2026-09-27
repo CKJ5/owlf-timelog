@@ -93,7 +93,7 @@ async function syncToFirestore(){
     const yesterday=yd();
     const dayData=S.daily[today]||{};
     
-    const meta={workStreak:S.work.streak||0,sleepStreak:S.life.sleepStreak||0,exStreak:S.exercise.streak||0,workMin:S.workMin||180,sleepTarget:S.sleepTarget||7,exTarget:S.exTarget||100,medalTarget:S.medalTarget||25,projectTypes:S.projectTypes||[],uiStyle:S.uiStyle||'owlf',weekStart:S.weekStart||0,ratioSelections:S.ratioSelections||{},recentSessions:S.recentSessions||[]};
+    const meta={workStreak:S.work.streak||0,sleepStreak:S.life.sleepStreak||0,exStreak:S.exercise.streak||0,workMin:S.workMin||180,sleepTarget:S.sleepTarget||7,exTarget:S.exTarget||100,medalTarget:S.medalTarget||25,projectTypes:S.projectTypes||[],uiStyle:S.uiStyle||'owlf',weekStart:S.weekStart||0,ratioSelections:S.ratioSelections||{},recentSessions:S.recentSessions||[],todos:S.todos||[],aiTasks:S.aiTasks||[]};
     const batch=db.batch();
     batch.set(db.doc(`users/${_uid}/days/${today}`),{...dayData,_ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
     // Also sync yesterday in case heavy/sleep sessions crossed midnight
@@ -168,6 +168,8 @@ async function restoreFromFirestore(){
       if(m.weekStart!==undefined)S.weekStart=m.weekStart;
       if(m.ratioSelections)S.ratioSelections=m.ratioSelections;
       if(m.recentSessions)S.recentSessions=m.recentSessions;
+      if(m.todos)S.todos=m.todos;
+      if(m.aiTasks)S.aiTasks=m.aiTasks;
     }
     // Restore all days
     const days=await db.collection(`users/${_uid}/days`).get();
@@ -2170,6 +2172,23 @@ function fmtCountdown(ms){
   const h=Math.floor(totalMin/60),m=totalMin%60;
   return h>0?(h+'h '+m+'m left'):(m+'m left');
 }
+// Given "HH:MM", returns the timestamp of the next time that clock time occurs
+// (today if it hasn't passed yet, otherwise tomorrow).
+function nextOccurrence(hhmm){
+  const parts=(hhmm||'').split(':').map(Number);
+  if(parts.length<2||isNaN(parts[0])||isNaN(parts[1]))return null;
+  const now=new Date();
+  const target=new Date(now.getFullYear(),now.getMonth(),now.getDate(),parts[0],parts[1],0,0);
+  if(target.getTime()<=now.getTime())target.setDate(target.getDate()+1);
+  return target.getTime();
+}
+function fmtCooldownTarget(ts){
+  if(!ts)return'';
+  const now=new Date(),t=new Date(ts);
+  const sameDay=t.getFullYear()===now.getFullYear()&&t.getMonth()===now.getMonth()&&t.getDate()===now.getDate();
+  const hh=pad(t.getHours()),mm=pad(t.getMinutes());
+  return (sameDay?'Today ':'Next ')+hh+':'+mm;
+}
 function renderAiTasks(){
   const area=document.getElementById('ai-task-list');
   if(!area)return;
@@ -2180,7 +2199,7 @@ function renderAiTasks(){
     const cnt=d['ai_'+t.id]||0;
     const cooling=t.cooldownUntil&&t.cooldownUntil>now;
     const stateCls=cooling?'ai-cooling':'ai-ready';
-    const sub=cooling?fmtCountdown(t.cooldownUntil-now):(cnt?cnt+'× today · Ready':'Ready');
+    const sub=cooling?(fmtCooldownTarget(t.cooldownUntil)+' · '+fmtCountdown(t.cooldownUntil-now)):(cnt?cnt+'× today · Ready':'Ready');
     return `<button class="ai-task-btn ${stateCls}" onclick="toggleAiTask('${t.id}')">
       <div><div style="color:var(--text);font-weight:700">${escapeHtml(t.name)}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${sub}</div></div>
       <div style="font-size:18px">${cooling?'⏳':'⚡'}</div>
@@ -2210,23 +2229,23 @@ function toggleAiTask(id){
 function showAiCooldownModal(id){
   const task=(S.aiTasks||[]).find(t=>t.id===id);
   if(!task)return;
-  const lastH=(task.lastCooldownHours!=null)?task.lastCooldownHours:'';
-  showModal(`<h3 style="color:var(--work)">⏱ Cooldown</h3><p style="color:var(--muted);font-size:13px;margin-bottom:10px">How many hours before "${escapeHtml(task.name)}" is ready again?</p><input type="number" id="ai-cd-inp" min="0" step="0.5" placeholder="e.g. 4" value="${lastH}" style="border-color:var(--work)" autofocus><div class="mbtns" style="margin-top:14px"><button class="bcanc" onclick="saveAiCooldown('${id}',0)">No cooldown</button><button class="bconf" style="background:var(--work)" onclick="saveAiCooldown('${id}')">Set</button></div>`,null);
+  const lastT=task.lastCooldownTime||'';
+  showModal(`<h3 style="color:var(--work)">⏱ Cooldown</h3><p style="color:var(--muted);font-size:13px;margin-bottom:10px">Ready again at — e.g. next 2:00 AM or next 1:00 PM</p><input type="time" id="ai-cd-inp" value="${lastT}" style="border-color:var(--work)" autofocus><div class="mbtns" style="margin-top:14px"><button class="bcanc" onclick="saveAiCooldown('${id}',true)">No cooldown</button><button class="bconf" style="background:var(--work)" onclick="saveAiCooldown('${id}',false)">Set</button></div>`,null);
   setTimeout(()=>document.getElementById('ai-cd-inp')?.focus(),80);
 }
-function saveAiCooldown(id,forceHours){
+function saveAiCooldown(id,skip){
   const task=(S.aiTasks||[]).find(t=>t.id===id);
-  let hours=forceHours;
-  if(hours===undefined){
-    const raw=document.getElementById('ai-cd-inp')?.value;
-    hours=(raw!==undefined&&raw!==''&&!isNaN(parseFloat(raw)))?parseFloat(raw):0;
+  let targetTime=null,targetTs=null;
+  if(!skip){
+    targetTime=(document.getElementById('ai-cd-inp')?.value||'').trim()||null;
+    targetTs=targetTime?nextOccurrence(targetTime):null;
   }
   if(task){
-    task.lastCooldownHours=hours;
-    task.cooldownUntil=hours>0?Date.now()+hours*3600*1000:null;
+    task.lastCooldownTime=targetTime;
+    task.cooldownUntil=targetTs;
     const d=getToday();
     const log=d['ai_'+id+'Log'];
-    if(log&&log.length)log[log.length-1].cooldownHours=hours;
+    if(log&&log.length)log[log.length-1].cooldownUntil=targetTs;
   }
   save();closeModal();renderAiTasks();
 }
@@ -3806,6 +3825,8 @@ function buildDailyCompact(dateKey){
       h+=`<div class="compact-row"><span style="color:var(--muted);font-size:12px">🐍 Heavy</span><span class="compact-val" style="color:var(--snake)">${(d.snakeSessions||0)}× — ${fmt(d.snakeDur||0)}</span></div>`;
       h+=`</div>`;
     }
+    // Ai Tasks — also under Work, as its own info drawer
+    h+=buildAiTasksInner(d,dateKey);
     h+='</div>';
     return h;
   }
@@ -3901,7 +3922,6 @@ function buildDailyCompact(dateKey){
     ]),
     
     buildPrepSection(d,dateKey),
-    buildAiSection(d,dateKey),
     compactSecFiltered('💪 Exercise','var(--ex)',[
       ['Total',d.exTotal||0,'var(--ex)'],
       ...EX_KEYS.map(t=>[EX_LABELS[t], String(d[t]||0)+((d[t+'Sets']&&d[t+'Sets'].length)?' ('+d[t+'Sets'].join('+')+')'  : '')])
@@ -3984,8 +4004,8 @@ function prepDrawer(id){
   }
 }
 
-// ═══ REPORT: AI TASKS (expandable per-task drawers) ═══
-function buildAiSection(d,dateKey){
+// ═══ REPORT: AI TASKS — rows nested inside the Work drawer (see buildWorkTree) ═══
+function buildAiTasksInner(d,dateKey){
   if(!d||!d.aiTotal)return'';
   const ids=Object.keys(d).filter(k=>k.startsWith('ai_')&&!k.endsWith('Log')).map(k=>k.slice(3));
   const rows=ids.map(id=>{
@@ -3998,25 +4018,24 @@ function buildAiSection(d,dateKey){
     const inner=log.map(e=>{
       const t=e.ts?new Date(e.ts):null;
       const clock=t?pad(t.getHours())+':'+pad(t.getMinutes()):'—';
-      const cd=(e.cooldownHours!=null)?(e.cooldownHours>0?e.cooldownHours+'h cooldown':'no cooldown'):'—';
+      const cd=e.cooldownUntil?fmtCooldownTarget(e.cooldownUntil):'no cooldown';
       return`<div style="display:flex;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;border-left:3px solid var(--work);background:var(--bg2);margin-top:3px">
         <span style="font-size:10px;color:var(--muted);min-width:42px">${clock}</span>
         <span style="font-size:11px;color:var(--text);flex:1;word-break:break-word">${escapeHtml(name)}</span>
         <span style="font-size:10px;color:var(--muted)">${cd}</span>
       </div>`;
     }).join('');
-    return`<div>
+    return`<div style="margin-bottom:4px">
       <div onclick="prepDrawer('${did}')" style="cursor:pointer;user-select:none" class="compact-row">
-        <span style="color:var(--muted);font-size:12px">🤖 ${escapeHtml(name)} <span id="${did}-arr" style="font-size:10px">▾</span></span>
+        <span style="color:var(--muted);font-size:12px">${escapeHtml(name)} <span id="${did}-arr" style="font-size:10px">▾</span></span>
         <span class="compact-val" style="color:var(--text)">${cnt}×</span>
       </div>
       <div id="${did}" style="overflow:hidden;max-height:0;transition:max-height .28s ease">${inner}</div>
     </div>`;
   }).filter(Boolean).join('');
   if(!rows)return'';
-  return`<div class="compact-section">
-    <div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--work);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:5px">🤖 Ai Tasks</div>
-    <div class="compact-row"><span style="color:var(--muted);font-size:12px">Total</span><span class="compact-val" style="color:var(--work)">${d.aiTotal}×</span></div>
+  return`<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px">
+    <div class="compact-row"><span style="color:var(--muted);font-size:12px">Ai Tasks</span><span class="compact-val" style="color:var(--work)">${d.aiTotal}×</span></div>
     ${rows}
   </div>`;
 }

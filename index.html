@@ -43,6 +43,7 @@ let _uid=null;
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'){
     if(typeof pullActiveFromFirestore==='function') pullActiveFromFirestore();
+    if(typeof syncToFirestore==='function') syncToFirestore();
     if(typeof _lastInteraction!=='undefined') _lastInteraction=Date.now();
     if(typeof _checkIdle==='function') _checkIdle();
   }
@@ -85,29 +86,90 @@ function updateFirebaseUI(user){
   }
 }
 
-// Delta sync — only today's day + meta
+// ═══ SYNC ENGINE (offline-safe) ═══
+// S._synced[key] = fingerprint of what Firestore is known to hold for that item
+// (days: dateKey · sessions: 's:'+dateKey · settings: 'meta').
+// Local content whose fingerprint differs from S._synced is "dirty" (not uploaded yet).
+// Dirty items are NEVER overwritten by a restore, and are uploaded whenever we are online.
+function _h(str){let h=5381;for(let i=0;i<str.length;i++)h=((h<<5)+h+str.charCodeAt(i))|0;return str.length+':'+h;}
+function _stable(v){
+  if(Array.isArray(v))return '['+v.map(_stable).join(',')+']';
+  if(v&&typeof v==='object')return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+_stable(v[k])).join(',')+'}';
+  return JSON.stringify(v);
+}
+const _dayHash=d=>_h(_stable(stripDay(d||{})));
+const _isEmptyDay=d=>!Object.keys(stripDay(d||{})).length;
+const _listHash=l=>_h(_stable(l||[]));
+const META_KEYS=['workStreak','sleepStreak','exStreak','workMin','sleepTarget','exTarget','medalTarget','projectTypes','uiStyle','weekStart','ratioSelections','recentSessions','todos','aiTasks'];
+function _metaObj(){
+  return {workStreak:S.work.streak||0,sleepStreak:S.life.sleepStreak||0,exStreak:S.exercise.streak||0,workMin:S.workMin||180,sleepTarget:S.sleepTarget||7,exTarget:S.exTarget||100,medalTarget:S.medalTarget||25,projectTypes:S.projectTypes||[],uiStyle:S.uiStyle||'owlf',weekStart:S.weekStart||0,ratioSelections:S.ratioSelections||{},recentSessions:S.recentSessions||[],todos:S.todos||[],aiTasks:S.aiTasks||[]};
+}
+function _applyMeta(m){
+  S.work.streak=m.workStreak;S.life.sleepStreak=m.sleepStreak;S.exercise.streak=m.exStreak;
+  S.workMin=m.workMin;S.sleepTarget=m.sleepTarget;S.exTarget=m.exTarget;S.medalTarget=m.medalTarget;
+  S.projectTypes=m.projectTypes;S.uiStyle=m.uiStyle;S.weekStart=m.weekStart;
+  S.ratioSelections=m.ratioSelections;S.recentSessions=m.recentSessions;S.todos=m.todos;S.aiTasks=m.aiTasks;
+}
+function _setDay(k,data){delete S.daily[k];const d=ensureDay(k);Object.assign(d,data);}
+
+let _syncBusy=false,_syncAgain=false,_restoredOnce=false;
+// Upload everything that changed since the last confirmed upload (not just today/yesterday),
+// so data recorded offline is pushed when the connection returns.
 async function syncToFirestore(){
-  if(!_uid)return;
+  if(!_uid||!db)return;
+  if(navigator.onLine===false)return;            // stay dirty, retried on 'online'
+  if(_syncBusy){_syncAgain=true;return;}
+  _syncBusy=true;
   try{
-    const today=tk();
-    const yesterday=yd();
-    const dayData=S.daily[today]||{};
-    
-    const meta={workStreak:S.work.streak||0,sleepStreak:S.life.sleepStreak||0,exStreak:S.exercise.streak||0,workMin:S.workMin||180,sleepTarget:S.sleepTarget||7,exTarget:S.exTarget||100,medalTarget:S.medalTarget||25,projectTypes:S.projectTypes||[],uiStyle:S.uiStyle||'owlf',weekStart:S.weekStart||0,ratioSelections:S.ratioSelections||{},recentSessions:S.recentSessions||[],todos:S.todos||[],aiTasks:S.aiTasks||[]};
-    const batch=db.batch();
-    batch.set(db.doc(`users/${_uid}/days/${today}`),{...dayData,_ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-    // Also sync yesterday in case heavy/sleep sessions crossed midnight
-    const ydayData=S.daily[yesterday];
-    if(ydayData)batch.set(db.doc(`users/${_uid}/days/${yesterday}`),{...ydayData,_ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-    // Also sync today's sessions
-    const sess=S.sessions[today]||[];
-    if(sess.length)batch.set(db.doc(`users/${_uid}/sessions/${today}`),{list:sess},{merge:true});
-    batch.set(db.doc(`users/${_uid}/meta/data`),meta,{merge:true});
-    await batch.commit();
+    if(!S._synced)S._synced={};
+    const ops=[],marks={};
+    Object.keys(S.daily||{}).forEach(k=>{
+      const d=S.daily[k];
+      if(_isEmptyDay(d))return;
+      const h=_dayHash(d);
+      if(S._synced[k]===h)return;
+      ops.push(b=>b.set(db.doc(`users/${_uid}/days/${k}`),{...stripDay(d),_ts:firebase.firestore.FieldValue.serverTimestamp()}));
+      marks[k]=h;
+    });
+    Object.keys(S.sessions||{}).forEach(k=>{
+      const l=S.sessions[k];
+      if(!l||!l.length)return;
+      const h=_listHash(l);
+      if(S._synced['s:'+k]===h)return;
+      ops.push(b=>b.set(db.doc(`users/${_uid}/sessions/${k}`),{list:l}));
+      marks['s:'+k]=h;
+    });
+    const meta=_metaObj();
+    const mh=_h(_stable(meta));
+    if(S._synced.meta!==mh){
+      ops.push(b=>b.set(db.doc(`users/${_uid}/meta/data`),meta,{merge:true}));
+      marks.meta=mh;
+    }
+    if(!ops.length)return;
+    for(let i=0;i<ops.length;i+=400){
+      const batch=db.batch();
+      ops.slice(i,i+400).forEach(f=>f(batch));
+      await Promise.race([batch.commit(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('sync timeout')),20000))]);
+    }
+    Object.assign(S._synced,marks);              // only mark as synced after the server confirmed
+    persistLocal();
     const lbl=document.getElementById('fb-sync-lbl');
     if(lbl)lbl.textContent='☁ '+new Date().toLocaleTimeString();
-  }catch(e){console.warn('Firestore sync failed:',e);}
+  }catch(e){console.warn('Firestore sync failed (will retry):',e);}
+  finally{
+    _syncBusy=false;
+    if(_syncAgain){_syncAgain=false;setTimeout(syncToFirestore,1000);}
+  }
 }
+
+// Coming back online (or returning to the app): restore if we never managed to, then push local changes.
+window.addEventListener('online',()=>{
+  if(!_uid)return;
+  (_restoredOnce?Promise.resolve():restoreFromFirestore()).then(()=>{
+    syncToFirestore();
+    if(typeof pullActiveFromFirestore==='function')pullActiveFromFirestore();
+  });
+});
 
   
 async function syncActiveToFirestore(){
@@ -149,51 +211,70 @@ async function pullActiveFromFirestore(){
 }
  
 
-// Restore all days from Firestore on login
+// Restore from Firestore on login — MERGE, never blindly overwrite local work.
 async function restoreFromFirestore(){
   if(!_uid)return;
   try{
-    // Restore meta
+    if(!S._synced)S._synced={};
+    if(!S.work)S.work={streak:0};
+    if(!S.life)S.life={cleanStreak:0,sleepStreak:0};
+    if(!S.exercise)S.exercise={streak:0};
+    if(!S.daily)S.daily={};
+    if(!S.sessions)S.sessions={};
+
+    // ── settings / meta ──
     const metaDoc=await db.doc(`users/${_uid}/meta/data`).get();
     if(metaDoc.exists){
       const m=metaDoc.data();
-      if(!S.work)S.work={streak:0};
-      if(!S.life)S.life={cleanStreak:0,sleepStreak:0};
-      if(!S.exercise)S.exercise={streak:0};
-      if(m.workStreak!==undefined)S.work.streak=m.workStreak;
-      if(m.sleepStreak!==undefined)S.life.sleepStreak=m.sleepStreak;
-      if(m.exStreak!==undefined)S.exercise.streak=m.exStreak;
-      if(m.projectTypes)S.projectTypes=m.projectTypes;
-      if(m.uiStyle)S.uiStyle=m.uiStyle;
-      if(m.weekStart!==undefined)S.weekStart=m.weekStart;
-      if(m.ratioSelections)S.ratioSelections=m.ratioSelections;
-      if(m.recentSessions)S.recentSessions=m.recentSessions;
-      if(m.todos)S.todos=m.todos;
-      if(m.aiTasks)S.aiTasks=m.aiTasks;
+      const local=_metaObj();
+      const remote={};
+      META_KEYS.forEach(k=>{remote[k]=m[k]!==undefined?m[k]:local[k];});
+      const lH=_h(_stable(local)),rH=_h(_stable(remote)),last=S._synced.meta;
+      if(lH===rH){S._synced.meta=rH;}
+      else if(last!==undefined&&lH!==last){/* local has un-uploaded edits → keep them, they get pushed below */}
+      else{_applyMeta(remote);S._synced.meta=_h(_stable(_metaObj()));}
     }
-    // Restore all days
+
+    // ── days ──
     const days=await db.collection(`users/${_uid}/days`).get();
-    if(!S.daily)S.daily={};
     days.forEach(doc=>{
       const k=doc.id;
-      if(!S.daily)S.daily={};   // ← ADD THIS
-      if(!S.daily[k])S.daily[k]=doc.data();
-      else Object.assign(S.daily[k],doc.data());
-      delete S.daily[k]._ts;
+      const remote=doc.data();delete remote._ts;
+      const rH=_dayHash(remote);
+      const local=S.daily[k];
+      const last=S._synced[k];
+      if(!local||_isEmptyDay(local)){_setDay(k,remote);S._synced[k]=rH;return;}
+      const lH=_dayHash(local);
+      if(lH===rH){S._synced[k]=rH;return;}
+      if(last!==undefined&&lH!==last)return;                    // local edited since last upload → local wins, will be pushed
+      if(last!==undefined){_setDay(k,remote);S._synced[k]=rH;return;} // local untouched → remote is newer
+      // no baseline (first run of this version): keep both — remote wins conflicts, local fills gaps
+      _setDay(k,Object.assign({},stripDay(local),stripDay(remote)));
+      S._synced[k]=rH;                                          // merged ≠ remote → stays dirty → uploaded
     });
-    
-    // Restore sessions
+
+    // ── sessions ──
     const sess=await db.collection(`users/${_uid}/sessions`).get();
     sess.forEach(doc=>{
-      const k=doc.id;
-      if(!S.sessions[k]&&doc.data().list)S.sessions[k]=doc.data().list;
+      const k=doc.id,list=doc.data().list;
+      if(!list)return;
+      const sk='s:'+k,rH=_listHash(list),local=S.sessions[k],last=S._synced[sk];
+      if(!local||!local.length){S.sessions[k]=list;S._synced[sk]=rH;return;}
+      const lH=_listHash(local);
+      if(lH===rH){S._synced[sk]=rH;return;}
+      if(last!==undefined&&lH!==last)return;
+      if(last!==undefined){S.sessions[k]=list;S._synced[sk]=rH;return;}
+      const sig=x=>x.ts+'|'+x.type+'|'+x.dur;
+      const seen=new Set(list.map(sig));
+      S.sessions[k]=list.concat(local.filter(x=>!seen.has(sig(x))));
+      S._synced[sk]=rH;
     });
+
     // Recalculate sleepHours for any day that has wakeTime but missing sleepHours
     Object.keys(S.daily).forEach(k=>{
       const d=S.daily[k];
-      if(!d||d.sleepHours)return; // already has it
-      if(!d.wakeTime)return;      // can't calculate without wake time
-      // Get the previous day's sleepTime
+      if(!d||d.sleepHours)return;
+      if(!d.wakeTime)return;
       const [y,mo,dy]=k.split('-').map(Number);
       const prev=new Date(Date.UTC(y,mo-1,dy-1)).toISOString().slice(0,10);
       const prevDay=S.daily[prev];
@@ -218,16 +299,17 @@ async function restoreFromFirestore(){
         d.design=recalc.design;d.games=recalc.games;d.clients=recalc.clients;
       }
     });
-      save();
-  if(document.readyState==='complete'||document.readyState==='interactive'){
-    updateWorkUI();updateLifeUI();updateExUI();renderReport();
-  } else {
-    document.addEventListener('DOMContentLoaded',()=>{
+    _restoredOnce=true;
+    persistLocal();
+    if(document.readyState==='complete'||document.readyState==='interactive'){
       updateWorkUI();updateLifeUI();updateExUI();renderReport();
-    });
-  }
-  console.log('Firestore restore done');
-    
+    } else {
+      document.addEventListener('DOMContentLoaded',()=>{
+        updateWorkUI();updateLifeUI();updateExUI();renderReport();
+      });
+    }
+    console.log('Firestore restore done');
+    syncToFirestore();                       // push anything recorded offline
   }catch(e){console.warn('Firestore restore failed:',e);}
 }
 </script>
@@ -827,7 +909,7 @@ function installPWA(){
     <span>🌍 Timezone</span><span class="set-group-arrow" id="arr-sg-timezone">▾</span>
   </div>
   <div class="set-group-body" id="sg-timezone">
-    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">All times stored and displayed in your local timezone.</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">All dates and times use GMT+8 (Malaysia), regardless of device timezone.</div>
     <div style="display:flex;gap:8px;margin-bottom:8px">
       <button onclick="autoDetectTZ()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--work);background:var(--bg3);color:var(--work);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;cursor:pointer">⚡ Auto Detect</button>
     </div>
@@ -1509,7 +1591,8 @@ const START='2026-01-01';
 let S={};
 const pad=n=>String(n).padStart(2,'0');
 // Malaysia time = UTC+8
-function getTZOffset(){return S.tzOffset!==undefined?S.tzOffset:8;}
+const TZ_OFFSET=8; // GMT+8 (Malaysia) — fixed, never device-dependent
+function getTZOffset(){return TZ_OFFSET;}
 
   function tsToMytMin(ts){
   if(!ts)return null;
@@ -1547,29 +1630,25 @@ function loadDevSettings(){
 }
 
   
-function autoDetectTZ(){
-  const offset=-new Date().getTimezoneOffset()/60;
-  S.tzOffset=offset;save();
-  loadTZSetting();
-  alert('Detected: UTC'+(offset>=0?'+':'')+offset);
-}
-function saveTZOffset(){
-  const v=parseFloat(document.getElementById('tz-offset-inp').value);
-  if(isNaN(v))return;
-  S.tzOffset=v;save();loadTZSetting();
-}
+function autoDetectTZ(){S.tzOffset=8;save();loadTZSetting();alert('Timezone is locked to GMT+8 (Malaysia).');}
+function saveTZOffset(){S.tzOffset=8;save();loadTZSetting();}
 function loadTZSetting(){
-  const offset=getTZOffset();
   const inp=document.getElementById('tz-offset-inp');
-  if(inp)inp.value=offset;
+  if(inp){inp.value=8;inp.disabled=true;}
   const lbl=document.getElementById('tz-current-lbl');
-  if(lbl)lbl.textContent='Current: UTC'+(offset>=0?'+':'')+offset;
+  if(lbl)lbl.textContent='Locked: GMT+8 (Malaysia)';
 }
   
 const tk=()=>myDate().toISOString().slice(0,10);
 const mk=()=>myDate().toISOString().slice(0,7);
 const yk=()=>myDate().toISOString().slice(0,4);
 const nowTs=()=>Date.now();
+// Date-key helpers: pure UTC arithmetic on 'YYYY-MM-DD' strings (immune to device timezone)
+const dkAdd=(k,n)=>{const[y,m,d]=k.split('-').map(Number);return new Date(Date.UTC(y,m-1,d+n)).toISOString().slice(0,10);};
+const dkDate=k=>new Date(k+'T00:00:00Z');        // read with getUTC*()
+const myYear=()=>parseInt(tk().slice(0,4),10);
+const fmtClock=ts=>{const d=new Date(new Date(ts).getTime()+getTZOffset()*3600*1000);return pad(d.getUTCHours())+':'+pad(d.getUTCMinutes());};
+const fmtClockSec=ts=>{const d=new Date(new Date(ts).getTime()+getTZOffset()*3600*1000);return pad(d.getUTCHours())+':'+pad(d.getUTCMinutes())+':'+pad(d.getUTCSeconds());};
 const elMin=t=>(nowTs()-t)/60000;
 const elSec=t=>Math.floor((nowTs()-t)/1000);
 function fmtSec(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;return h>0?h+':'+pad(m)+':'+pad(ss):m+':'+pad(ss);}
@@ -1589,10 +1668,11 @@ function toMin(h,m){return h*60+m;}
 function calcSignedStreak(hitFn,opts){
   opts=opts||{};
   const skipMissing=!!opts.skipMissing;
-  let cur=new Date();
+  let curK=tk();
+  const cur={setDate(){curK=dkAdd(curK,-1);},getDate(){return 0;}};
   let dir=null,count=0;
   for(let i=0;i<365;i++){
-    const k=cur.toISOString().slice(0,10);
+    const k=curK;
     const dd=S.daily[k];
     const isToday=(i===0);
     if(!dd&&skipMissing){cur.setDate(cur.getDate()-1);continue;}
@@ -1676,6 +1756,8 @@ function loadS(){
   if(!S.todos)S.todos=[];
   if(!S.lastExSets)S.lastExSets={};
   if(!S.aiTasks)S.aiTasks=[];
+  S.tzOffset=8;                       // clear any old wrong timezone value
+  if(!S._synced)S._synced={};
 }
 
 
@@ -1718,6 +1800,9 @@ function save(){
   clearTimeout(save._t);
   save._t=setTimeout(syncToFirestore,3000);
   
+  persistLocal();
+}
+function persistLocal(){
   const stripped=stripForSave(S);
   const json=JSON.stringify(stripped);
   const compressed=LZString.compress(json);
@@ -1749,7 +1834,7 @@ function ensureDay(k){
 }
 function getToday(){return ensureDay(tk());}
 function yd(){
-  return new Date(myDate().getTime()-86400000).toISOString().slice(0,10);
+  return dkAdd(tk(),-1);
 }
 function entTotalDay(d){return(d.entGame||0)+(d.entShow||0)+(d.entOutdoor||0)+(d.entClean||0)+(d.entLaydown||0)+(d.entDate||0);}
 
@@ -2177,17 +2262,16 @@ function fmtCountdown(ms){
 function nextOccurrence(hhmm){
   const parts=(hhmm||'').split(':').map(Number);
   if(parts.length<2||isNaN(parts[0])||isNaN(parts[1]))return null;
-  const now=new Date();
-  const target=new Date(now.getFullYear(),now.getMonth(),now.getDate(),parts[0],parts[1],0,0);
-  if(target.getTime()<=now.getTime())target.setDate(target.getDate()+1);
-  return target.getTime();
+  const my=myDate();
+  let t=Date.UTC(my.getUTCFullYear(),my.getUTCMonth(),my.getUTCDate(),parts[0],parts[1],0,0)-getTZOffset()*3600*1000;
+  if(t<=Date.now())t+=86400000;
+  return t;
 }
 function fmtCooldownTarget(ts){
   if(!ts)return'';
-  const now=new Date(),t=new Date(ts);
-  const sameDay=t.getFullYear()===now.getFullYear()&&t.getMonth()===now.getMonth()&&t.getDate()===now.getDate();
-  const hh=pad(t.getHours()),mm=pad(t.getMinutes());
-  return (sameDay?'Today ':'Next ')+hh+':'+mm;
+  const off=getTZOffset()*3600*1000;
+  const sameDay=new Date(ts+off).toISOString().slice(0,10)===tk();
+  return (sameDay?'Today ':'Next ')+fmtClock(ts);
 }
 function renderAiTasks(){
   const area=document.getElementById('ai-task-list');
@@ -2421,10 +2505,12 @@ function saveNap(){
 function scheduleSleepReminder(wakeTimeStr){
   // Notify to sleep 17 hours after wake time (to maintain ~7h sleep cycle)
   const{h,m}=parseHM(wakeTimeStr);
-  const wakeMs=new Date();wakeMs.setHours(h,m,0,0);
-  if(wakeMs<Date.now())wakeMs.setDate(wakeMs.getDate()+1);
-  const sleepTarget=new Date(wakeMs.getTime()+(24-(S.sleepTarget||7))*3600*1000);
-  const msUntil=sleepTarget.getTime()-Date.now();
+  const my=myDate();
+  let wakeTs=Date.UTC(my.getUTCFullYear(),my.getUTCMonth(),my.getUTCDate(),h,m,0,0)-getTZOffset()*3600*1000;
+  if(wakeTs<Date.now())wakeTs+=86400000;
+  const sleepTarget=new Date(wakeTs+(24-(S.sleepTarget||7))*3600*1000+getTZOffset()*3600*1000); // shifted so timeStr() (UTC getters) prints GMT+8
+  const sleepTargetReal=new Date(sleepTarget.getTime()-getTZOffset()*3600*1000);
+  const msUntil=sleepTargetReal.getTime()-Date.now();
   if(msUntil>0&&msUntil<86400000){
     setTimeout(()=>{
       if(getNotifPref('sleep'))sendNotif('🌙 Time to Sleep','Sleep now to keep your 7h+ streak! Target: '+timeStr(sleepTarget),'owlf-sleep');
@@ -2826,8 +2912,8 @@ function sendTodoNotif(t){
 function checkTodoReminders(){
   if(!S.todos||!S.todos.length)return;
   if(!('Notification' in window)||Notification.permission!=='granted')return;
-  const now=new Date();
-  const curHM=pad(now.getHours())+':'+pad(now.getMinutes());
+  const nowMY=myDate();
+  const curHM=pad(nowMY.getUTCHours())+':'+pad(nowMY.getUTCMinutes());
   let changed=false;
   S.todos.forEach(t=>{
     if(t.done||t.notified||!t.time)return;
@@ -3215,14 +3301,12 @@ function saveWeekStart(){
 function updateSettingsWeekStart(){const el=document.getElementById('week-start-inp');if(el)el.value=getWeekStart();}
 
 function getWeekKey(d){
-  const dt=new Date(d);dt.setHours(0,0,0,0);
+  const key=(typeof d==='string')?d.slice(0,10):(d&&d.getFullYear?d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()):tk());
   const ws=getWeekStart();
-  const day=dt.getDay();
-  const diff=(day-ws+7)%7;
-  dt.setDate(dt.getDate()-diff);
-  return dt.toISOString().slice(0,10);
+  const day=dkDate(key).getUTCDay();
+  return dkAdd(key,-((day-ws+7)%7));
 }
-function fmtWeek(k){const d=new Date(k+'T00:00:00');const e=new Date(k+'T00:00:00');e.setDate(e.getDate()+6);const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return M[d.getMonth()]+' '+d.getDate()+'–'+e.getDate();}
+function fmtWeek(k){const d=dkDate(k);const e=dkDate(dkAdd(k,6));const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return M[d.getUTCMonth()]+' '+d.getUTCDate()+'–'+e.getUTCDate();}
 
 // ── RATIO BAR METRICS — 3-page system ───────────────────────────────────────
 const RATIO_PAGES={
@@ -3409,7 +3493,7 @@ function buildRatioBar(dayKeys){
 function switchReport(mode){
   rMode=mode;
   ['daily','weekly','monthly','yearly'].forEach(m=>{const el=document.getElementById('rtab-'+m);if(el)el.className='rtab'+(m===mode?' active':'');});
-  rSel=mode==='daily'?tk():mode==='weekly'?getWeekKey(new Date()):mode==='monthly'?mk():yk();
+  rSel=mode==='daily'?tk():mode==='weekly'?getWeekKey(tk()):mode==='monthly'?mk():yk();
   renderReport();
 }
 
@@ -3421,7 +3505,7 @@ function renderReport(){
   if(barEl){
     let keys=[];
     if(rMode==='daily'){if(S.daily[rSel])keys=[rSel];}
-    else if(rMode==='weekly'){const ws=new Date(rSel+'T00:00:00');for(let i=0;i<7;i++){const d=new Date(ws);d.setDate(d.getDate()+i);const k=d.toISOString().slice(0,10);if(S.daily[k])keys.push(k);}}
+    else if(rMode==='weekly'){for(let i=0;i<7;i++){const k=dkAdd(rSel,i);if(S.daily[k])keys.push(k);}}
     else if(rMode==='monthly'){keys=Object.keys(S.daily).filter(k=>k.startsWith(rSel)&&k>=START);}
     else{const months=Array.from({length:12},(_,i)=>`${rSel}-${pad(i+1)}`);months.forEach(mo=>Object.keys(S.daily).filter(k=>k.startsWith(mo)&&k>=START).forEach(k=>keys.push(k)));}
     barEl.innerHTML=buildRatioBar(keys);
@@ -3658,7 +3742,7 @@ function shiftYear(dir){rCalYear=String(parseInt(rCalYear)+dir);renderReport();}
 
 // ── YEARLY CALENDAR (simple year list) ───────────────────────────────────────
 function buildYearlyCal(){
-  const curYr=new Date().getFullYear();
+  const curYr=myYear();
   let cells='';
   for(let y=curYr;y>=2026;y--){
     const yr=String(y);
@@ -3685,8 +3769,7 @@ function panelNavigate(dir){
     if(k>=START&&k<=tk()){rSel=k;rCalMonth=k.slice(0,7);renderReport();}
   } else if(rMode==='weekly'){
     const [py,pm,pd]=rSel.split('-').map(Number);
-    const cur=new Date(Date.UTC(py,pm-1,pd+7*dir));
-    const k=getWeekKey(cur);
+    const k=getWeekKey(dkAdd(rSel,7*dir));
     rSel=k;rCalMonth=k.slice(0,7);renderReport();
   } else if(rMode==='monthly'){
     const [y,m]=rSel.split('-').map(Number);
@@ -3696,7 +3779,7 @@ function panelNavigate(dir){
     rSel=ny+'-'+pad(nm);rCalYear=String(ny);renderReport();
   } else {
     const y=parseInt(rSel)+dir;
-    if(y>=2026&&y<=new Date().getFullYear()){rSel=String(y);renderReport();}
+    if(y>=2026&&y<=myYear()){rSel=String(y);renderReport();}
   }
 }
 
@@ -3991,7 +4074,7 @@ function buildDailyCompact(dateKey){
     
     journal?`<div class="compact-section"><div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;border-bottom:1px solid var(--border);padding-bottom:5px">📓 Journal</div><textarea rows="4" style="width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:13px;resize:none;line-height:1.6" oninput="saveInlineJournal('${dateKey}',this.value)">${journal}</textarea></div>`
     :`<div class="compact-section"><div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;border-bottom:1px solid var(--border);padding-bottom:5px">📓 Journal</div><textarea rows="3" placeholder="Write your thoughts..." style="width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:13px;resize:none;line-height:1.6" oninput="saveInlineJournal('${dateKey}',this.value)"></textarea></div>`,
-    emrg.length?compactSec('🚨 Emergency','#c0392b',emrg.map(e=>[new Date(e.ts).toLocaleTimeString(),e.text,'#c0392b'])):'',
+    emrg.length?compactSec('🚨 Emergency','#c0392b',emrg.map(e=>[fmtClockSec(e.ts),e.text,'#c0392b'])):'',
     `<button class="emr-btn" onclick="logEmergency('${dateKey}')">🚨 Emergency Log</button>`
   ].join('');
 }
@@ -4025,8 +4108,7 @@ function buildPrepSection(d,dateKey){
     const did='pd-'+dateKey.replace(/-/g,'')+'-'+type;
     const hasDetail=log.length>0;
     const inner=log.map(e=>{
-      const t=e.end?new Date(e.end):null;
-      const clock=t?pad(t.getHours())+':'+pad(t.getMinutes()):'—';
+      const clock=e.end?fmtClock(e.end):'—';
       const name=prepEntryName(type,e);
       return`<div style="display:flex;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;border-left:3px solid var(--ex);background:var(--bg2);margin-top:3px">
         <span style="font-size:10px;color:var(--muted);min-width:42px">${clock}</span>
@@ -4076,8 +4158,7 @@ function buildAiTasksInner(d,dateKey){
     const name=(log[0]&&log[0].name)||(taskDef&&taskDef.name)||'Task';
     const did='ad-'+dateKey.replace(/-/g,'')+'-'+id;
     const inner=log.map(e=>{
-      const t=e.ts?new Date(e.ts):null;
-      const clock=t?pad(t.getHours())+':'+pad(t.getMinutes()):'—';
+      const clock=e.ts?fmtClock(e.ts):'—';
       const cd=e.cooldownUntil?fmtCooldownTarget(e.cooldownUntil):'no cooldown';
       return`<div style="display:flex;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;border-left:3px solid var(--work);background:var(--bg2);margin-top:3px">
         <span style="font-size:10px;color:var(--muted);min-width:42px">${clock}</span>
@@ -4180,8 +4261,8 @@ function buildTimeline(dateKey){
   });
 
 // Sleep bars
-  const tlYdKey=new Date(new Date(dateKey+'T00:00:00').getTime()-86400000).toISOString().slice(0,10);
-  const tlTmrKey=new Date(new Date(dateKey+'T00:00:00').getTime()+86400000).toISOString().slice(0,10);
+  const tlYdKey=dkAdd(dateKey,-1);
+  const tlTmrKey=dkAdd(dateKey,1);
   const tlYdDay=S.daily[tlYdKey];
   const tlTmrDay=S.daily[tlTmrKey];
 
@@ -4375,8 +4456,8 @@ function rebuildGridRows(uid,dateKey,startMin,totalMin,isFull){
     return`<div style="position:relative;height:12px;margin:0 0 3px 0"><div style="position:absolute;left:0;width:100%;height:100%;border-radius:2px;background:repeating-linear-gradient(90deg,rgba(150,150,150,0.06) 0px,rgba(150,150,150,0.06) 4px,transparent 4px,transparent 8px)"></div>${evs.map(b).join('')}<div style="position:absolute;right:2px;top:1px;font-size:8px;color:${c.color}">${c.label}</div></div>`;
   }
   
-  const tlYdKey2=new Date(new Date(dateKey+'T00:00:00').getTime()-86400000).toISOString().slice(0,10);
-  const tlTmrKey2=new Date(new Date(dateKey+'T00:00:00').getTime()+86400000).toISOString().slice(0,10);
+  const tlYdKey2=dkAdd(dateKey,-1);
+  const tlTmrKey2=dkAdd(dateKey,1);
   const tlYdDay2=S.daily[tlYdKey2];
   const tlTmrDay2=S.daily[tlTmrKey2];
   const sleepMinRb=d.sleepTime?(parseHM(d.sleepTime).h*60+parseHM(d.sleepTime).m):null;
@@ -4440,8 +4521,8 @@ function tlToggle(uid){
 
   
 function buildWeeklyCompact(weekStart){
-  const ws=new Date(weekStart+'T00:00:00');const days=[];
-  for(let i=0;i<7;i++){const d=new Date(ws);d.setDate(d.getDate()+i);days.push(d.toISOString().slice(0,10));}
+  const days=[];
+  for(let i=0;i<7;i++)days.push(dkAdd(weekStart,i));
   const vd=days.filter(k=>k>=START&&S.daily[k]);
   if(!vd.length)return`<p style="color:var(--muted);text-align:center;padding:40px">No data</p>`;
   let wT=0,eT=0,fT=0,slH=0,slD=0,exT=0,exDays=0,snS=0,snD=0;
@@ -4536,7 +4617,7 @@ function buildDaily(dateKey){
     <div class="rtitle">📓 Journal</div>
     <textarea id="journal-inline-${dateKey}" rows="3" placeholder="Write your thoughts for this day..." oninput="saveInlineJournal('${dateKey}',this.value)" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:13px;resize:none;line-height:1.6;margin-top:4px">${journal}</textarea>
   </div>
-  ${emrg.length?`<div class="report-sec"><div class="rtitle" style="color:#c0392b">Emergency Logs</div>${emrg.map(e=>`<div class="rrow"><span style="font-size:12px;color:var(--muted)">${new Date(e.ts).toLocaleTimeString()}</span><span style="font-size:12px;color:#c0392b">${e.text}</span></div>`).join('')}</div>`:''}
+  ${emrg.length?`<div class="report-sec"><div class="rtitle" style="color:#c0392b">Emergency Logs</div>${emrg.map(e=>`<div class="rrow"><span style="font-size:12px;color:var(--muted)">${fmtClockSec(e.ts)}</span><span style="font-size:12px;color:#c0392b">${e.text}</span></div>`).join('')}</div>`:''}
   `:'<p style="color:var(--muted);text-align:center;padding:20px 0">No data for this day</p>'}
   <button class="emr-btn" onclick="logEmergency('${dateKey}')">🚨 Emergency Log</button>
   </div>`;
@@ -4702,8 +4783,8 @@ function toggleCmpMetric(m,btn){
   renderCompare();
 }
 function renderCompare(){
-  const days=[];let cur=new Date();
-  for(let i=6;i>=0;i--){const d=new Date(cur);d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+  const days=[];
+  for(let i=6;i>=0;i--)days.push(dkAdd(tk(),-i));
   const metricColor={sleep:'var(--life)',work:'var(--work)',design:'var(--work)',games:'var(--work)',clients:'var(--work)',heavy:'var(--snake)',show:'var(--life)',play:'var(--life)',meditation:'var(--fire-c)'};
   const metricLabel={sleep:'Sleep',work:'Work Total',design:'Design',games:'Games',clients:'Clients',heavy:'Heavy',show:'Show',play:'Play',meditation:'Meditate'};
   function getVal(k,metric){
@@ -4727,7 +4808,7 @@ function renderCompare(){
     html+='<div class="cmp-chart">';
     days.forEach((k,i)=>{
       const v=vals[i];const pct=Math.max(4,(v/maxV)*100);
-      const dayName=['Su','Mo','Tu','We','Th','Fr','Sa'][new Date(k).getDay()];
+      const dayName=['Su','Mo','Tu','We','Th','Fr','Sa'][dkDate(k).getUTCDay()];
       html+=`<div class="cmp-bar-wrap"><div class="cmp-bar-val">${v>=60?Math.round(v/60)+'h':v?v+'m':''}</div><div class="cmp-bar" style="height:${pct}%;background:${metricColor[metric]};opacity:${v?1:.18}"></div><div class="cmp-bar-lbl">${dayName}<br>${parseInt(k.slice(8))}</div></div>`;
     });
     html+='</div></div>';
@@ -5152,9 +5233,8 @@ function renderMedals(){
 
   // ── WEEKLY ───────────────────────────────────────────────────────────────────
   if(period==='weekly'){
-    const ws=new Date(sel+'T00:00:00');
     const days=[];
-    for(let i=0;i<7;i++){const d=new Date(ws);d.setDate(d.getDate()+i);days.push(d.toISOString().slice(0,10));}
+    for(let i=0;i<7;i++)days.push(dkAdd(sel,i));
     const moKey2=days[0].slice(0,7);
     const wTgt2=getMonthTarget('workMin',moKey2);
     const slTgt2=getMonthTarget('sleepTarget',moKey2);
@@ -5444,9 +5524,9 @@ function saveInlineJournal(dateKey,val){
 
 // ═══ WEEKLY REPORT ═══
 function buildWeekly(weekStart){
-  const ws=new Date(weekStart+'T00:00:00');
+  const ws=dkDate(weekStart);
   const days=[];
-  for(let i=0;i<7;i++){const d=new Date(ws);d.setDate(d.getDate()+i);days.push(d.toISOString().slice(0,10));}
+  for(let i=0;i<7;i++)days.push(dkAdd(weekStart,i));
   const validDays=days.filter(k=>k>=START&&S.daily[k]);
   if(!validDays.length)return`<div style="text-align:center;color:var(--muted);padding:40px">No data for this week</div>`;
   let wT=0,eT=0,fT=0,slH=0,slD=0,exT=0,exDays=0,snS=0,snD=0;
@@ -5458,22 +5538,22 @@ function buildWeekly(weekStart){
     exT+=(d.exTotal||0);if(d.exHit)exDays++;
     snS+=(d.snakeSessions||0);snD+=(d.snakeDur||0);
   });
-  const we=new Date(ws);we.setDate(we.getDate()+6);
+  const we=dkDate(dkAdd(weekStart,6));
   const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const title=MN[ws.getMonth()]+' '+ws.getDate()+' – '+MN[we.getMonth()]+' '+we.getDate()+', '+ws.getFullYear();
+  const title=MN[ws.getUTCMonth()]+' '+ws.getUTCDate()+' – '+MN[we.getUTCMonth()]+' '+we.getUTCDate()+', '+ws.getUTCFullYear();
   const maxW=Math.max(...days.map(k=>S.daily[k]?((S.daily[k].design||0)+(S.daily[k].games||0)+(S.daily[k].clients||0)):0),1);
   const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const dayBars=days.map(k=>{
     const d=S.daily[k];const w=d?((d.design||0)+(d.games||0)+(d.clients||0)):0;
     const pct=Math.round((w/maxW)*100);
-    const dt=new Date(k+'T00:00:00');
+    const dt=dkDate(k);
     const isTriple=d&&checkDailyTriple(k);
     return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
       <div style="font-size:9px;color:${isTriple?'var(--work)':'transparent'}">${isTriple?'★':'-'}</div>
       <div style="width:100%;height:60px;display:flex;align-items:flex-end">
         <div style="width:100%;height:${Math.max(4,pct)}%;background:${w?'var(--work)':'var(--border)'};border-radius:3px 3px 0 0"></div>
       </div>
-      <div style="font-size:8px;color:var(--muted)">${DN[dt.getDay()]}</div>
+      <div style="font-size:8px;color:var(--muted)">${DN[dt.getUTCDay()]}</div>
       <div style="font-size:8px;font-family:'Space Mono',monospace;color:${w?'var(--work)':'var(--muted)'}">${w?fmt(w):'-'}</div>
     </div>`;
   }).join('');

@@ -63,7 +63,9 @@ auth.onAuthStateChanged(user=>{
     updateFirebaseUI(user);
     restoreFromFirestore();
     pullActiveFromFirestore();  // ← ADD THIS LINE
+    syncTodos().then(startTodoListener);
   } else {
+    stopTodoListener();
     _uid=null;
     updateFirebaseUI(null);
   }
@@ -101,7 +103,7 @@ async function syncToFirestore(){
     const yesterday=yd();
     const dayData=S.daily[today]||{};
     
-    const meta={workStreak:S.work.streak||0,sleepStreak:S.life.sleepStreak||0,exStreak:S.exercise.streak||0,workMin:S.workMin||180,sleepTarget:S.sleepTarget||7,exTarget:S.exTarget||100,medalTarget:S.medalTarget||25,projectTypes:S.projectTypes||[],uiStyle:S.uiStyle||'owlf',weekStart:S.weekStart||0,ratioSelections:S.ratioSelections||{},recentSessions:S.recentSessions||[],todos:S.todos||[],aiTasks:S.aiTasks||[]};
+    const meta={workStreak:S.work.streak||0,sleepStreak:S.life.sleepStreak||0,exStreak:S.exercise.streak||0,workMin:S.workMin||180,sleepTarget:S.sleepTarget||7,exTarget:S.exTarget||100,medalTarget:S.medalTarget||25,projectTypes:S.projectTypes||[],uiStyle:S.uiStyle||'owlf',weekStart:S.weekStart||0,ratioSelections:S.ratioSelections||{},recentSessions:S.recentSessions||[],aiTasks:S.aiTasks||[]};
     const batch=db.batch();
     batch.set(db.doc(`users/${_uid}/days/${today}`),{...dayData,_ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
     // Also sync yesterday in case heavy/sleep sessions crossed midnight
@@ -118,6 +120,59 @@ async function syncToFirestore(){
 }
 
   
+// ═══ TO-DO SYNC — per-item merge (newest `updated` wins), tombstones for deletes ═══
+function mergeTodoLists(a,b){
+  const map=new Map();
+  [...(a||[]),...(b||[])].forEach(raw=>{
+    if(!raw||!raw.id)return;
+    const t=normTodo({...raw});
+    const cur=map.get(t.id);
+    if(!cur||t.updated>cur.updated||(t.updated===cur.updated&&t.deleted&&!cur.deleted))map.set(t.id,t);
+  });
+  const cutoff=Date.now()-30*864e5;
+  return [...map.values()].filter(t=>!(t.deleted&&t.updated<cutoff)).sort((x,y)=>x.id<y.id?-1:x.id>y.id?1:0);
+}
+const _todoSig=l=>(l||[]).map(t=>t.id+':'+t.updated).sort().join('|');
+let _todoSyncBusy=false,_todoSyncAgain=false,_todoUnsub=null;
+function _todoRef(){return db.doc(`users/${_uid}/meta/todos`);}
+async function syncTodos(){
+  if(!_uid||!db)return;
+  if(_todoSyncBusy){_todoSyncAgain=true;return;}
+  _todoSyncBusy=true;
+  try{
+    let merged;
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(_todoRef());
+      let remote;
+      if(snap.exists)remote=snap.data().items||[];
+      else{ // first run on this account: adopt the old array stored in meta/data
+        const md=await tx.get(db.doc(`users/${_uid}/meta/data`));
+        remote=(md.exists&&md.data().todos)||[];
+      }
+      merged=mergeTodoLists(S.todos||[],remote);
+      tx.set(_todoRef(),{items:merged,_ts:firebase.firestore.FieldValue.serverTimestamp()});
+    });
+    S.todos=mergeTodoLists(S.todos,merged);   // keeps any edit made while the transaction ran
+    save();renderTodos();
+  }catch(e){console.warn('Todo sync failed (will retry):',e);}
+  finally{
+    _todoSyncBusy=false;
+    if(_todoSyncAgain){_todoSyncAgain=false;setTimeout(syncTodos,300);}
+  }
+}
+function startTodoListener(){
+  if(!_uid||!db||_todoUnsub)return;
+  _todoUnsub=_todoRef().onSnapshot(snap=>{
+    if(!snap.exists||snap.metadata.hasPendingWrites)return;
+    const remote=snap.data().items||[];
+    const merged=mergeTodoLists(S.todos||[],remote);
+    const changedLocal=_todoSig(merged)!==_todoSig(S.todos);
+    if(changedLocal){S.todos=merged;save();renderTodos();if(typeof checkTodoReminders==='function')checkTodoReminders();}
+    if(_todoSig(merged)!==_todoSig(remote))setTimeout(syncTodos,300);   // we hold newer data — push it
+  },e=>console.warn('Todo listener error:',e));
+}
+function stopTodoListener(){if(_todoUnsub){_todoUnsub();_todoUnsub=null;}}
+
 async function syncActiveToFirestore(){
   if(!_uid)return;
   try{
@@ -176,7 +231,6 @@ async function restoreFromFirestore(){
       if(m.weekStart!==undefined)S.weekStart=m.weekStart;
       if(m.ratioSelections)S.ratioSelections=m.ratioSelections;
       if(m.recentSessions)S.recentSessions=m.recentSessions;
-      if(m.todos)S.todos=m.todos;
       if(m.aiTasks)S.aiTasks=m.aiTasks;
     }
     // Restore all days
@@ -1528,7 +1582,7 @@ function installPWA(){
 <!-- Contains: timers, UI updates, work/life/exercise/reports -->
 <!-- ════════════════════════════════════════════════════════════ -->
 <script>
-const VER='4.4';
+const VER='4.5';
 const KEY='owlf_v8';
 const START='2026-01-01';
 let S={};
@@ -2785,37 +2839,142 @@ function toggleCardio(type){
 }
  
   
-// ═══ TO-DO / REMINDERS ═══
+// ═══ TO-DO / REMINDERS (one-off + repeating, merged per item across devices) ═══
 function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function uid(){return 't'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+
+// ---- date math on 'YYYY-MM-DD' strings (timezone-proof, month-end safe) ----
+function _ymd(y,m,d){return new Date(Date.UTC(y,m,d)).toISOString().slice(0,10);}
+function addToDate(ymd,n,unit){
+  const [y,m,d]=ymd.split('-').map(Number);
+  if(unit==='day')return _ymd(y,m-1,d+n);
+  if(unit==='week')return _ymd(y,m-1,d+7*n);
+  const tot=(m-1)+(unit==='year'?12*n:n);
+  const ty=y+Math.floor(tot/12),tm=((tot%12)+12)%12;
+  const dim=new Date(Date.UTC(ty,tm+1,0)).getUTCDate();   // Jan 31 + 1 month → Feb 28/29
+  return _ymd(ty,tm,Math.min(d,dim));
+}
+function fmtDueDate(ymd){
+  const [y,m,d]=ymd.split('-').map(Number);
+  return new Date(Date.UTC(y,m-1,d)).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'});
+}
+function todoRepeatText(r){
+  if(!r)return'';
+  const base=r.every===1?({day:'Daily',week:'Weekly',month:'Monthly',year:'Yearly'}[r.unit]):('Every '+r.every+' '+r.unit+'s');
+  return '🔁 '+base+(r.mode==='done'?' · from done':'');
+}
+// Fills in fields older to-dos don't have. Deterministic, so every device normalises identically.
+function normTodo(t){
+  if(!t.due)t.due=(t.created||'').slice(0,10)||tk();
+  if(t.updated==null)t.updated=Date.parse(t.created)||0;
+  if(t.notifiedFor===undefined)t.notifiedFor=t.notified?t.due:null;
+  return t;
+}
+function touchTodo(t){t.updated=Math.max(Date.now(),(t.updated||0)+1);}
+function todosChanged(){
+  save();renderTodos();
+  clearTimeout(todosChanged._t);
+  todosChanged._t=setTimeout(()=>{if(typeof syncTodos==='function')syncTodos();},400);
+}
+
 function renderTodos(){
   const area=document.getElementById('todo-list');
   if(!area)return;
-  const todos=(S.todos||[]).filter(t=>!t.done);
+  const today=tk();
+  const todos=(S.todos||[]).filter(t=>!t.deleted&&!t.done).map(normTodo)
+    .sort((a,b)=>(a.due+(a.time||'')).localeCompare(b.due+(b.time||'')));
   if(!todos.length){area.innerHTML='<div style="font-size:12px;color:var(--muted);padding:6px 0 2px">No to-dos yet — tap + Add.</div>';return;}
-  area.innerHTML=todos.map(t=>`
-    <div class="prow" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
-      <div style="flex:1;min-width:0">
+  area.innerHTML=todos.map(t=>{
+    const future=t.due>today;
+    const bits=[];
+    if(t.repeat&&t.due<today)bits.push(`<span style="color:#ff4466">⚠ Overdue · ${fmtDueDate(t.due)}</span>`);
+    else if(future)bits.push('📅 '+fmtDueDate(t.due));
+    else if(t.repeat)bits.push('📅 Today');
+    if(t.time)bits.push('⏰ '+t.time);
+    if(t.repeat)bits.push(todoRepeatText(t.repeat));
+    return `
+    <div class="prow" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);${future?'opacity:.6':''}">
+      <div style="flex:1;min-width:0;cursor:pointer" onclick="showTodoModal('${t.id}')">
         <div style="font-size:14px;color:var(--text);word-break:break-word">${escapeHtml(t.text)}</div>
-        ${t.time?`<div style="font-size:10px;color:var(--muted);margin-top:2px">⏰ ${t.time}</div>`:''}
+        ${bits.length?`<div style="font-size:10px;color:var(--muted);margin-top:2px">${bits.join(' · ')}</div>`:''}
       </div>
       <button onclick="completeTodo('${t.id}')" style="flex-shrink:0;padding:6px 12px;border-radius:8px;border:1.5px solid var(--life);background:transparent;color:var(--life);font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">✓ Done</button>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
-function showAddTodo(){
+function showAddTodo(){showTodoModal();}
+function showTodoModal(id){
+  const t=id?(S.todos||[]).find(x=>x.id===id):null;
+  if(id&&!t)return;
+  if(t)normTodo(t);
+  const r=t&&t.repeat;
+  const sel=(a,b)=>a===b?' selected':'';
   const permWarn=(('Notification' in window)&&Notification.permission!=='granted')
     ?`<p style="font-size:11px;color:var(--warn,#e0a030);margin:8px 0 0;line-height:1.5">⚠️ Notifications aren't enabled yet — you'll be asked to allow them when you save a reminder time.</p>`:'';
-  showModal(`<h3 style="color:var(--life)">📝 New To-Do</h3><label class="mlbl">What do you need to do?</label><input type="text" id="todo-inp-text" placeholder="e.g. Call the dentist" style="border-color:var(--life)" autofocus><label class="mlbl" style="margin-top:10px">Remind me at (optional)</label><input type="time" id="todo-inp-time" style="border-color:var(--life)">${permWarn}<div class="mbtns" style="margin-top:14px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" style="background:var(--life)" onclick="saveNewTodo()">Add</button></div>`,null);
-  setTimeout(()=>document.getElementById('todo-inp-text')?.focus(),80);
+  showModal(`<h3 style="color:var(--life)">${t?'✎ Edit To-Do':'📝 New To-Do'}</h3>
+    <label class="mlbl">What do you need to do?</label>
+    <input type="text" id="todo-inp-text" value="${escapeHtml(t?t.text:'')}" placeholder="e.g. Call the dentist" style="border-color:var(--life)">
+    <div style="display:flex;gap:8px">
+      <div style="flex:1;min-width:0"><label class="mlbl">Date</label><input type="date" id="todo-inp-date" value="${t?t.due:tk()}" style="border-color:var(--life)"></div>
+      <div style="flex:1;min-width:0"><label class="mlbl">Remind at</label><input type="time" id="todo-inp-time" value="${t&&t.time?t.time:''}" style="border-color:var(--life)"></div>
+    </div>
+    <label style="display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:700;color:var(--text);margin:2px 0 10px">🔁 Repeat
+      <input type="checkbox" id="todo-rep-on" ${r?'checked':''} onchange="todoRepToggle()" style="width:18px;height:18px;accent-color:var(--life);margin:0"></label>
+    <div id="todo-rep-box" style="display:${r?'block':'none'}">
+      <label class="mlbl">Every</label>
+      <div style="display:flex;gap:8px">
+        <input type="number" id="todo-rep-n" min="1" max="999" value="${r?r.every:1}" style="flex:1;border-color:var(--life)">
+        <select id="todo-rep-unit" style="flex:2;border-color:var(--life)">
+          <option value="day"${sel(r&&r.unit,'day')}>day(s)</option>
+          <option value="week"${sel(r&&r.unit,'week')}>week(s)</option>
+          <option value="month"${sel(r&&r.unit,'month')}>month(s)</option>
+          <option value="year"${sel(r&&r.unit,'year')}>year(s)</option>
+        </select>
+      </div>
+      <label class="mlbl">Next one is counted from</label>
+      <select id="todo-rep-mode" style="border-color:var(--life)">
+        <option value="fixed"${sel(r&&r.mode,'fixed')}>Fixed schedule (the original date)</option>
+        <option value="done"${sel(r&&r.mode,'done')}>The day I mark it done</option>
+      </select>
+    </div>
+    ${permWarn}
+    <div class="mbtns" style="margin-top:14px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" style="background:var(--life)" onclick="saveTodoModal(${t?`'${t.id}'`:''})">${t?'Save':'Add'}</button></div>
+    ${t?`<button class="bcanc" style="width:100%;margin-top:8px;border-color:#ff4466;color:#ff4466" onclick="deleteTodo('${t.id}')">🗑 Delete</button>`:''}`,null);
+  if(!t)setTimeout(()=>document.getElementById('todo-inp-text')?.focus(),80);
 }
-function saveNewTodo(){
-  const text=(document.getElementById('todo-inp-text')?.value||'').trim();
+function todoRepToggle(){
+  const on=document.getElementById('todo-rep-on')?.checked;
+  const box=document.getElementById('todo-rep-box');
+  if(box)box.style.display=on?'block':'none';
+  const tm=document.getElementById('todo-inp-time');
+  if(on&&tm&&!tm.value)tm.value='09:00';   // a repeating reminder needs a time to alert at
+}
+function saveTodoModal(id){
+  const $=i=>document.getElementById(i);
+  const text=($('todo-inp-text')?.value||'').trim();
   if(!text){closeModal();return;}
-  const time=(document.getElementById('todo-inp-time')?.value||'').trim()||null;
+  const due=$('todo-inp-date')?.value||tk();
+  const time=($('todo-inp-time')?.value||'').trim()||null;
+  let repeat=null;
+  if($('todo-rep-on')?.checked){
+    repeat={every:Math.max(1,Math.min(999,parseInt($('todo-rep-n').value)||1)),unit:$('todo-rep-unit').value,mode:$('todo-rep-mode').value};
+  }
   if(!S.todos)S.todos=[];
-  S.todos.push({id:uid(),text,time,done:false,notified:false,created:new Date().toISOString()});
-  save();closeModal();renderTodos();
+  const t=id?S.todos.find(x=>x.id===id):null;
+  if(t){
+    const changed=t.due!==due||t.time!==time||JSON.stringify(t.repeat||null)!==JSON.stringify(repeat);
+    t.text=text;t.due=due;t.time=time;t.repeat=repeat;
+    if(changed){
+      t.notifiedFor=null;
+      if(repeat){t.anchor=due;t.rk=0;}else{delete t.anchor;delete t.rk;}
+    }
+    touchTodo(t);
+  }else{
+    const n={id:uid(),text,time,due,repeat,notifiedFor:null,created:new Date().toISOString(),updated:Date.now()};
+    if(repeat){n.anchor=due;n.rk=0;}
+    S.todos.push(n);
+  }
+  closeModal();todosChanged();
   if(time&&('Notification' in window)&&Notification.permission==='default'){
     requestNotifPerm().then(perm=>{
       if(perm!=='granted')alert('Reminder saved, but notifications are off — go to Settings to enable them or this reminder won\'t alert you.');
@@ -2824,11 +2983,35 @@ function saveNewTodo(){
     alert('Reminder saved, but notifications are blocked in your browser settings — this reminder won\'t alert you until you allow them.');
   }
 }
+function deleteTodo(id){
+  const t=(S.todos||[]).find(x=>x.id===id);
+  if(!t)return;
+  t.deleted=true;touchTodo(t);          // tombstone, so the deletion syncs to other devices
+  closeModal();todosChanged();
+  if(window._swReg?.active)window._swReg.active.postMessage({type:'CLEAR',tag:'todo-'+id});
+}
 function completeTodo(id){
-  if(!S.todos)return;
-  const t=S.todos.find(x=>x.id===id);
-  S.todos=S.todos.filter(x=>x.id!==id);
-  save();renderTodos();
+  const t=(S.todos||[]).find(x=>x.id===id);
+  if(!t)return;
+  normTodo(t);
+  const today=tk();
+  if(t.repeat){
+    const r=t.repeat;let nd;
+    if(r.mode==='done'){
+      nd=addToDate(today,r.every,r.unit);        // counted from the day it was ticked
+      t.anchor=nd;t.rk=0;
+    }else{
+      if(!t.anchor){t.anchor=t.due;t.rk=0;}      // fixed schedule: stays on original cadence,
+      let k=t.rk||0,g=0;                         // skips any occurrences already missed
+      do{k++;nd=addToDate(t.anchor,k*r.every,r.unit);}while(nd<=today&&++g<5000);
+      t.rk=k;
+    }
+    t.due=nd;t.lastDone=Date.now();t.notifiedFor=null;
+  }else{
+    t.deleted=true;
+  }
+  touchTodo(t);
+  todosChanged();
   if(window._swReg?.active)window._swReg.active.postMessage({type:'CLEAR',tag:'todo-'+id});
 }
 function sendTodoNotif(t){
@@ -2852,20 +3035,21 @@ function sendTodoNotif(t){
 function checkTodoReminders(){
   if(!S.todos||!S.todos.length)return;
   if(!('Notification' in window)||Notification.permission!=='granted')return;
-  const now=new Date();
-  const curHM=pad(now.getHours())+':'+pad(now.getMinutes());
+  const today=tk(),hm=myDate().toISOString().slice(11,16);   // same clock as tk(), so all devices agree
   let changed=false;
   S.todos.forEach(t=>{
-    if(t.done||t.notified||!t.time)return;
-    if(t.time<=curHM){
+    normTodo(t);
+    if(t.deleted||t.done||!t.time||t.notifiedFor===t.due)return;
+    if(t.due<today||(t.due===today&&t.time<=hm)){
       sendTodoNotif(t);
-      t.notified=true;changed=true;
+      t.notifiedFor=t.due;touchTodo(t);changed=true;   // synced, so other devices won't alert again
     }
   });
-  if(changed)save();
+  if(changed)todosChanged();
 }
 setInterval(checkTodoReminders,20000);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkTodoReminders();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(typeof syncTodos==='function')syncTodos();checkTodoReminders();}});
+window.addEventListener('online',()=>{if(typeof syncTodos==='function')syncTodos();});
 // Tapping "✓ Done" on the OS notification completes the to-do here too
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message',e=>{

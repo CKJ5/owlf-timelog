@@ -331,7 +331,7 @@ const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
 const mUrl=URL.createObjectURL(mBlob);
 document.getElementById('pwa-manifest-link').href=mUrl;
 </script>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap" rel="stylesheet">
 <!-- ════════════════════════════════════════════════════════════ -->
 <!-- SECTION: CSS                                             -->
 <!-- Paste this section to Claude for style/theme changes     -->
@@ -731,6 +731,47 @@ body.light .work-chip-btn.act-work{background:rgba(223,182,126,.13);box-shadow:0
 .medal-pct{font-family:'Space Mono',monospace;font-size:10px;font-weight:700;text-align:center}
 @keyframes medal-glow{0%,100%{filter:drop-shadow(0 0 6px currentColor)}50%{filter:drop-shadow(0 0 16px currentColor)}}
 .medal-done .medal-inner{animation:medal-glow 2s ease-in-out infinite}
+/* ══ PAPER — warm paper minimal (ink, serif titles, muted earth tones) ══ */
+body.style-paper{
+  --work:#b9633b;--life:#5f7f63;--ex:#4f7896;--snake:#85709f;--fire-c:#a8512f;
+  --bg:#f6f1e9;--bg2:#fffdf9;--bg3:#f3ede3;--bg4:#ebe3d6;
+  --text:#2b2620;--muted:#8f867a;--border:#e6ded0;
+  --shadow:0 1px 2px rgba(80,60,30,.05),0 10px 28px -14px rgba(80,60,30,.16);
+  --btn-shadow:0 1px 2px rgba(80,60,30,.06);
+  --grain-opacity:.05;
+}
+body.style-paper::after{display:none}
+body.style-paper::before{mix-blend-mode:multiply}
+body.style-paper ::selection{background:rgba(185,99,59,.22)}
+body.style-paper,body.style-paper *{font-family:'Inter',sans-serif!important}
+body.style-paper .card-lbl,body.style-paper .sec-title,body.style-paper .modal h3,body.style-paper .sw-title{font-family:'Fraunces',Georgia,serif!important;font-weight:600;letter-spacing:.005em;text-transform:none}
+body.style-paper .card-lbl{font-size:15px;color:var(--text)}
+body.style-paper .sec-title{font-size:26px;font-weight:600}
+body.style-paper .sec-lbl,body.style-paper .top-date,body.style-paper .sw-label{letter-spacing:.14em}
+body.style-paper .top-time,body.style-paper .snum,body.style-paper .ttimer,body.style-paper .ent-timer,body.style-paper .prep-timer,body.style-paper .wbig-timer,body.style-paper .rval,body.style-paper .compact-val,body.style-paper .sw-num,body.style-paper .inline-streak-num{font-family:'Space Mono',monospace!important;font-weight:400;letter-spacing:-.02em}
+body.style-paper .card{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:16px;box-shadow:var(--shadow)}
+body.style-paper .top-bar{background:rgba(246,241,233,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--border);box-shadow:none}
+body.style-paper .tab-bar{background:rgba(255,253,249,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--border);box-shadow:none}
+body.style-paper .tab-btn{font-weight:600;letter-spacing:.06em}
+body.style-paper .toggle-btn,body.style-paper .wbig,body.style-paper .sw-btn,body.style-paper .ex-btn,body.style-paper .ent-btn,body.style-paper .work-chip-btn,body.style-paper .prep-btn{background:var(--bg2);border:1px solid var(--border);border-radius:14px;box-shadow:var(--btn-shadow);color:var(--text);transition:background .2s,border-color .2s,transform .12s}
+body.style-paper .toggle-btn:active,body.style-paper .wbig:active,body.style-paper .sw-btn:active,body.style-paper .ex-btn:active,body.style-paper .ent-btn:active,body.style-paper .prep-btn:active{transform:scale(.985)}
+body.style-paper .toggle-btn.act-work,body.style-paper .wbig.act-work,body.style-paper .work-chip-btn.act-work{background:rgba(185,99,59,.09);border-color:rgba(185,99,59,.45);box-shadow:none}
+body.style-paper .toggle-btn.act-life,body.style-paper .ent-btn.act-life,body.style-paper .sw-btn.is-set,body.style-paper .prep-btn.act-prep{background:rgba(95,127,99,.11);border-color:rgba(95,127,99,.45);box-shadow:none}
+body.style-paper .toggle-btn.act-snake{background:rgba(133,112,159,.1);border-color:rgba(133,112,159,.45);box-shadow:none}
+body.style-paper .toggle-btn.act-fire{background:rgba(168,81,47,.09);border-color:rgba(168,81,47,.45);box-shadow:none}
+body.style-paper .sbox{background:var(--bg3);border:none;border-radius:12px;box-shadow:none}
+body.style-paper .pbar-wrap{background:var(--bg4);border-radius:99px}
+body.style-paper .pbar{border-radius:99px}
+body.style-paper .modal{background:var(--bg2);border:1px solid var(--border);border-radius:24px;box-shadow:0 24px 70px -24px rgba(60,40,10,.4)}
+body.style-paper .modal-overlay{background:rgba(43,38,32,.45);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+body.style-paper .modal input,body.style-paper .modal textarea,body.style-paper .modal select{background:var(--bg3);border:1px solid var(--border);border-radius:12px;color:var(--text)}
+body.style-paper .modal input:focus,body.style-paper .modal textarea:focus,body.style-paper .modal select:focus{outline:none;border-color:var(--work);box-shadow:0 0 0 3px rgba(185,99,59,.14)}
+body.style-paper .mlbl{letter-spacing:.1em}
+body.style-paper .bconf{background:var(--text);color:#fffdf9;border-radius:12px;font-weight:600}
+body.style-paper .bcanc{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:12px}
+body.style-paper .prow{border-color:var(--border)!important}
+body.style-paper .report-popup-sheet{background:var(--bg2)!important;border-top:1px solid var(--border)}
+body.style-paper [id^="tl-grid-"]{filter:saturate(.62) brightness(.97)}
 </style>
 <!-- END: CSS -->
 <!-- ════════════════════════════════════════════════════════════ -->
@@ -1845,12 +1886,14 @@ const STYLES=[
    bg:'#000',   card:'#111',    accent:'#fff',     text:'#fff'},
   {key:'modern', name:'Modern',   desc:'Clean iOS',    cls:['style-modern','light'],
    bg:'#f2f2f7',card:'#fff',   accent:'#111',     text:'#111'},
+  {key:'paper',  name:'Paper',    desc:'Warm & quiet', cls:['style-paper','light'],
+   bg:'#f6f1e9',card:'#fffdf9',accent:'#b9633b',text:'#2b2620'},
 ];
 function getStyle(){return S.uiStyle||'owlf';}
 function applyStyle(){
   const key=getStyle();
   const st=STYLES.find(s=>s.key===key)||STYLES[0];
-  document.body.classList.remove('light','style-neu','style-glass','style-bw','style-modern');
+  document.body.classList.remove('light','style-neu','style-glass','style-bw','style-modern','style-paper');
   st.cls.forEach(c=>document.body.classList.add(c));
   if(key==='glass'){
     document.documentElement.style.cssText='background:linear-gradient(135deg,#0f0c29,#302b63,#24243e)!important;min-height:100vh';
@@ -1858,7 +1901,7 @@ function applyStyle(){
     document.documentElement.style.cssText='';
   }
   // Sync PWA theme-color to current style
-  const themeColors={owlf:'#0d0d0d',neu:'#e0e5ec',glass:'#302b63',bw:'#000000',modern:'#f2f2f7'};
+  const themeColors={owlf:'#0d0d0d',neu:'#e0e5ec',glass:'#302b63',bw:'#000000',modern:'#f2f2f7',paper:'#f6f1e9'};
   const tc=document.getElementById('theme-color-meta');
   if(tc)tc.content=themeColors[key]||'#0d0d0d';
 }

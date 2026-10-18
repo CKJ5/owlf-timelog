@@ -64,8 +64,10 @@ auth.onAuthStateChanged(user=>{
     restoreFromFirestore();
     pullActiveFromFirestore();  // ← ADD THIS LINE
     syncTodos().then(startTodoListener);
+    syncPlanner().then(startPlannerListener);
   } else {
     stopTodoListener();
+    stopPlannerListener();
     _uid=null;
     updateFirebaseUI(null);
   }
@@ -172,6 +174,53 @@ function startTodoListener(){
   },e=>console.warn('Todo listener error:',e));
 }
 function stopTodoListener(){if(_todoUnsub){_todoUnsub();_todoUnsub=null;}}
+
+// ═══ PLANNER SYNC — blocks + projects, per-item merge (newest `updated` wins) ═══
+function mergeById(a,b){
+  const map=new Map();
+  [...(a||[]),...(b||[])].forEach(t=>{
+    if(!t||!t.id)return;
+    const u=t.updated||0,cur=map.get(t.id);
+    if(!cur||u>(cur.updated||0)||(u===(cur.updated||0)&&t.deleted&&!cur.deleted))map.set(t.id,t);
+  });
+  const cutoff=Date.now()-30*864e5;
+  return [...map.values()].filter(t=>!(t.deleted&&(t.updated||0)<cutoff)).sort((x,y)=>x.id<y.id?-1:x.id>y.id?1:0);
+}
+const _plSig=l=>(l||[]).map(t=>t.id+':'+(t.updated||0)).sort().join('|');
+let _plSyncBusy=false,_plSyncAgain=false,_plUnsub=null;
+function _plRef(){return db.doc(`users/${_uid}/meta/planner`);}
+function _plRefresh(){if(typeof renderPlanCard==='function')renderPlanCard(true);if(typeof renderPva==='function')renderPva();}
+async function syncPlanner(){
+  if(!_uid||!db)return;
+  if(_plSyncBusy){_plSyncAgain=true;return;}
+  _plSyncBusy=true;
+  try{
+    let mb,mp;
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(_plRef());
+      const r=snap.exists?snap.data():{};
+      mb=mergeById(S.plan,r.blocks);mp=mergeById(S.projects,r.projects);
+      tx.set(_plRef(),{blocks:mb,projects:mp,_ts:firebase.firestore.FieldValue.serverTimestamp()});
+    });
+    S.plan=mergeById(S.plan,mb);S.projects=mergeById(S.projects,mp);
+    save();_plRefresh();
+  }catch(e){console.warn('Planner sync failed (will retry):',e);}
+  finally{
+    _plSyncBusy=false;
+    if(_plSyncAgain){_plSyncAgain=false;setTimeout(syncPlanner,300);}
+  }
+}
+function startPlannerListener(){
+  if(!_uid||!db||_plUnsub)return;
+  _plUnsub=_plRef().onSnapshot(snap=>{
+    if(!snap.exists||snap.metadata.hasPendingWrites)return;
+    const r=snap.data();
+    const mb=mergeById(S.plan,r.blocks),mp=mergeById(S.projects,r.projects);
+    if(_plSig(mb)!==_plSig(S.plan)||_plSig(mp)!==_plSig(S.projects)){S.plan=mb;S.projects=mp;save();_plRefresh();}
+    if(_plSig(mb)!==_plSig(r.blocks)||_plSig(mp)!==_plSig(r.projects))setTimeout(syncPlanner,300);
+  },e=>console.warn('Planner listener error:',e));
+}
+function stopPlannerListener(){if(_plUnsub){_plUnsub();_plUnsub=null;}}
 
 async function syncActiveToFirestore(){
   if(!_uid)return;
@@ -731,6 +780,15 @@ body.light .work-chip-btn.act-work{background:rgba(223,182,126,.13);box-shadow:0
 .medal-pct{font-family:'Space Mono',monospace;font-size:10px;font-weight:700;text-align:center}
 @keyframes medal-glow{0%,100%{filter:drop-shadow(0 0 6px currentColor)}50%{filter:drop-shadow(0 0 16px currentColor)}}
 .medal-done .medal-inner{animation:medal-glow 2s ease-in-out infinite}
+/* PLANNER */
+.plan-btn{flex:1;padding:10px 8px;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+.plan-btn.pri{background:var(--work);border-color:var(--work);color:#1a1000}
+.plan-btn:disabled{opacity:.6}
+.plan-mini{width:26px;height:26px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;font-size:14px;line-height:1;font-family:inherit}
+.plan-chip{padding:5px 10px;border-radius:99px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;margin:0 4px 6px 0;font-family:inherit}
+.pva-tab{padding:6px 12px;border-radius:99px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.pva-tab.on{background:var(--work);border-color:var(--work);color:#1a1000}
+body.style-paper .plan-btn.pri,body.style-paper .pva-tab.on{color:#fffdf9}
 /* ══ PAPER — warm paper minimal (ink, serif titles, muted earth tones) ══ */
 body.style-paper{
   --work:#b9633b;--life:#5f7f63;--ex:#4f7896;--snake:#85709f;--fire-c:#a8512f;
@@ -1199,6 +1257,24 @@ function installPWA(){
   </div>
 </div>
 
+<div class="card" id="plan-card">
+  <div class="card-hdr">
+    <span class="card-lbl" style="color:var(--work)">📋 Plan</span>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="plan-mini" onclick="planNav(-1)">‹</button>
+      <span id="plan-date-lbl" style="font-size:11px;font-weight:700;color:var(--muted);min-width:92px;text-align:center"></span>
+      <button class="plan-mini" onclick="planNav(1)">›</button>
+    </div>
+  </div>
+  <div id="plan-sum" style="font-size:12px;color:var(--muted);margin-bottom:2px"></div>
+  <div id="plan-body"></div>
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <button class="plan-btn pri" onclick="showPlanModal()">＋ Add block</button>
+    <button class="plan-btn" onclick="showProjectsModal()">📁 Projects</button>
+    <button class="plan-btn" onclick="showCalModal()">📅</button>
+  </div>
+</div>
+
 <div class="card" id="ai-card">
   <div class="card-hdr card-hdr-btn" onclick="toggleCardCollapse('ai-body','ai-collapse-arrow','ai-hdr-lbl')">
     <span class="card-lbl" id="ai-hdr-lbl" style="color:var(--work)">Ai</span>
@@ -1536,6 +1612,22 @@ function installPWA(){
     <div id="medals-crystals" style="display:none;padding:0px 0 0;min-height:0px;align-items:center;justify-content:center"></div>
   </div>
 
+  <div class="card" id="pva-card">
+    <div class="card-hdr card-hdr-btn" onclick="pvaToggle()" style="margin-bottom:4px">
+      <span class="card-lbl" style="color:var(--work)">📐 Plan vs Actual</span>
+      <span id="pva-arrow" style="font-size:12px;color:var(--muted)">▾</span>
+    </div>
+    <div id="pva-sum" style="font-size:12px;color:var(--muted)"></div>
+    <div id="pva-content" style="display:none;margin-top:10px">
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="pva-tab on" id="pva-t-proj" onclick="pvaSet('proj')">Projects</button>
+        <button class="pva-tab" id="pva-t-acc" onclick="pvaSet('acc')">Accuracy</button>
+        <button class="pva-tab" id="pva-t-type" onclick="pvaSet('type')">By type</button>
+      </div>
+      <div id="pva-body"></div>
+    </div>
+  </div>
+
   <div class="rtab-row">
     <button class="rtab active" id="rtab-daily" onclick="switchReport('daily')">Daily</button>
     <button class="rtab" id="rtab-weekly" onclick="switchReport('weekly')">Weekly</button>
@@ -1623,7 +1715,7 @@ function installPWA(){
 <!-- Contains: timers, UI updates, work/life/exercise/reports -->
 <!-- ════════════════════════════════════════════════════════════ -->
 <script>
-const VER='4.5';
+const VER='4.6';
 const KEY='owlf_v8';
 const START='2026-01-01';
 let S={};
@@ -1794,6 +1886,8 @@ function loadS(){
   if(!S.ratioSelections)S.ratioSelections={};
   if(!S.recentSessions)S.recentSessions=[];
   if(!S.todos)S.todos=[];
+  if(!S.projects)S.projects=[];
+  if(!S.plan)S.plan=[];
   if(!S.lastExSets)S.lastExSets={};
   if(!S.aiTasks)S.aiTasks=[];
   if(typeof S.tzOffset!=='number'||isNaN(S.tzOffset))S.tzOffset=8; // force-correct any bad/legacy value — everything is GMT+8
@@ -2258,7 +2352,9 @@ function stopWork(type,startTs){
   if(!S.sessions)S.sessions={};
   if(!S.sessions[tk()])S.sessions[tk()]=[];
   const ptype=S.active['w_'+type]?.ptype||'';
-  S.sessions[tk()].push({type,proj,ptype,dur:net,wasted:wst,ts:new Date().toISOString()});
+  const _pid=S.active['w_'+type]?.planId||null;
+  S.sessions[tk()].push({type,proj,ptype,dur:net,wasted:wst,ts:new Date().toISOString(),...(_pid?{planId:_pid}:{})});
+  if(_pid)finishPlanBlock(_pid,actualStart,wst);
   delete S.active['w_'+type];
   console.log('stopping, active after delete:', JSON.stringify(S.active)); // ← ADD
   if(window._swReg?.active)window._swReg.active.postMessage({type:'CLEAR',tag:'owlf-work'});
@@ -2287,6 +2383,435 @@ function toggleSnake(){
   }
 }
  
+
+// ═══ PLANNER — plan vs actual blocks, projects, Google Calendar ═══
+const hm2min=s=>{const p=(s||'').split(':').map(Number);return(isNaN(p[0])||isNaN(p[1]))?null:p[0]*60+p[1];};
+const min2hm=m=>{m=((Math.round(m)%1440)+1440)%1440;return pad(Math.floor(m/60))+':'+pad(m%60);};
+const tsToHM=ts=>min2hm(tsToMytMin(ts));
+let planDate=null;
+const pDate=()=>planDate||tk();
+const liveItems=a=>(a||[]).filter(x=>x&&!x.deleted);
+function touchP(x){x.updated=Math.max(Date.now(),(x.updated||0)+1);}
+function plannerChanged(){
+  save();renderPlanCard(true);renderPva();
+  clearTimeout(plannerChanged._t);
+  plannerChanged._t=setTimeout(()=>{if(typeof syncPlanner==='function')syncPlanner();},400);
+}
+function actMinOf(b){
+  const s=hm2min(b.aStart),e=hm2min(b.aEnd);
+  if(s===null||e===null)return null;
+  let d=e-s;if(d<0)d+=1440;
+  return Math.max(0,d-(b.wasted||0));
+}
+function blockDev(b){if(b.aMin==null||!b.pMin)return null;return(b.aMin-b.pMin)/b.pMin*100;}
+function devColor(p){if(p==null)return'var(--muted)';const a=Math.abs(p);if(a<=10)return'#3fa66b';if(p>0)return a<=30?'#e0a030':'#e0524d';return'#4f8fc0';}
+function fmtDev(p){return(p>0?'+':'')+Math.round(p)+'%';}
+function projById(id){return liveItems(S.projects).find(p=>p.id===id);}
+function projActualMin(p){
+  let t=0;
+  liveItems(S.plan).forEach(b=>{if(b.projId===p.id&&b.aMin!=null)t+=b.aMin;});
+  Object.values(S.sessions||{}).forEach(arr=>(arr||[]).forEach(s=>{if(!s.planId&&s.proj===p.name)t+=(s.dur||0);}));
+  return t;
+}
+function typeStats(){
+  const m={};
+  liveItems(S.plan).filter(b=>b.aMin!=null&&b.pMin>0).forEach(b=>{const k=b.ptype||'';const o=m[k]||(m[k]={n:0,p:0,a:0});o.n++;o.p+=b.pMin;o.a+=b.aMin;});
+  return m;
+}
+function estBar(act,est){
+  const pct=est>0?act/est*100:0;
+  const col=!est?'var(--muted)':pct>100?'#e0524d':pct>=80?'#e0a030':'#3fa66b';
+  return `<div style="height:8px;border-radius:99px;background:var(--bg4);overflow:hidden"><div style="height:100%;width:${est?Math.min(100,pct):0}%;background:${col};border-radius:99px"></div></div>`;
+}
+
+// ---------- Today's plan card ----------
+let _planSig='';
+function planNav(delta){
+  const [y,m,d]=pDate().split('-').map(Number);
+  planDate=new Date(Date.UTC(y,m-1,d+delta)).toISOString().slice(0,10);
+  if(planDate===tk())planDate=null;
+  renderPlanCard(true);
+}
+function suggestStart(date){
+  const bs=liveItems(S.plan).filter(b=>b.date===date);
+  if(bs.length)return min2hm(Math.max(...bs.map(b=>(hm2min(b.pStart)||0)+b.pMin)));
+  if(date===tk())return min2hm(Math.ceil(tsToMytMin(Date.now())/15)*15);
+  return'09:00';
+}
+function planTimeline(blocks,date){
+  if(!blocks.length)return'';
+  const nowMin=date===tk()?tsToMytMin(Date.now()):null;
+  const runAct=Object.values(S.active||{}).filter(a=>a&&a.planId);
+  const segs=[];let lo=1e9,hi=-1;
+  blocks.forEach(b=>{
+    const ps=hm2min(b.pStart)||0,pe=ps+b.pMin;let as=null,ae=null;
+    if(b.aStart&&b.aEnd){as=hm2min(b.aStart);ae=hm2min(b.aEnd);if(ae<=as)ae+=1440;}
+    else{const r=runAct.find(a=>a.planId===b.id);if(r&&nowMin!=null){as=tsToMytMin(r.start);ae=Math.max(as+1,nowMin);}}
+    lo=Math.min(lo,ps,as==null?ps:as);hi=Math.max(hi,pe,ae==null?pe:ae);
+    segs.push({b,ps,pe,as,ae});
+  });
+  lo=Math.max(0,Math.floor((lo-10)/60)*60);hi=Math.min(2880,Math.ceil((hi+10)/60)*60);
+  const T=hi-lo;if(T<=0)return'';
+  const x=m=>((m-lo)/T*100).toFixed(2);
+  const step=T>720?180:T>360?120:60;
+  let grid='';
+  for(let m=lo;m<=hi;m+=step)grid+=`<div style="position:absolute;left:${x(m)}%;top:0;bottom:0;border-left:1px dashed var(--border)"></div><div style="position:absolute;left:${x(m)}%;bottom:-13px;font-size:8px;color:var(--muted);transform:translateX(-50%)">${pad(Math.floor(m/60)%24)}</div>`;
+  if(nowMin!=null&&nowMin>=lo&&nowMin<=hi)grid+=`<div style="position:absolute;left:${x(nowMin)}%;top:-3px;bottom:-3px;width:2px;background:#e0524d;border-radius:2px;z-index:3"></div>`;
+  const planBars=segs.map(s=>`<div style="position:absolute;left:${x(s.ps)}%;width:${((s.pe-s.ps)/T*100).toFixed(2)}%;top:0;bottom:0;border:1.5px solid var(--work);background:color-mix(in srgb,var(--work) 18%,transparent);border-radius:4px"></div>`).join('');
+  const actBars=segs.filter(s=>s.as!=null).map(s=>{const dv=s.b.aEnd?blockDev(s.b):null;return`<div style="position:absolute;left:${x(s.as)}%;width:${Math.max(.8,(s.ae-s.as)/T*100).toFixed(2)}%;top:0;bottom:0;background:${s.b.aEnd?devColor(dv):'var(--work)'};border-radius:4px;${s.b.aEnd?'':'opacity:.7'}"></div>`;}).join('');
+  const lane=(lbl,inner)=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span style="width:34px;font-size:8px;font-weight:700;letter-spacing:.08em;color:var(--muted)">${lbl}</span><div style="position:relative;flex:1;height:16px;z-index:2">${inner}</div></div>`;
+  return `<div style="position:relative;padding-bottom:14px;margin:6px 0 8px"><div style="position:absolute;left:40px;right:0;top:0;bottom:14px;z-index:1">${grid}</div>${lane('PLAN',planBars)}${lane('ACTUAL',actBars)}</div>`;
+}
+function renderPlanCard(force){
+  const el=document.getElementById('plan-body');if(!el)return;
+  const date=pDate(),today=tk();
+  const blocks=liveItems(S.plan).filter(b=>b.date===date).sort((a,b)=>(hm2min(a.pStart)||0)-(hm2min(b.pStart)||0));
+  const act=Object.keys(S.active||{}).filter(k=>k.startsWith('w_')).map(k=>S.active[k]).filter(a=>a&&a.planId);
+  const sig=date+JSON.stringify(blocks)+act.map(a=>a.planId+a.start).join()+Math.floor(Date.now()/60000);
+  if(!force&&sig===_planSig)return;
+  _planSig=sig;
+  const lbl=document.getElementById('plan-date-lbl');
+  if(lbl)lbl.textContent=(date===today?'Today · ':'')+fmtDueDate(date);
+  const sum=document.getElementById('plan-sum');
+  const P=blocks.reduce((s,b)=>s+b.pMin,0);
+  const fin=blocks.filter(b=>b.aMin!=null);
+  const FP=fin.reduce((s,b)=>s+b.pMin,0),FA=fin.reduce((s,b)=>s+b.aMin,0);
+  if(sum)sum.innerHTML=blocks.length?`Planned <b>${fmt(P)}</b>`+(fin.length?` · Done ${fin.length}/${blocks.length} · <span style="color:${devColor((FA-FP)/FP*100)};font-weight:700">${fmt(FA)} vs ${fmt(FP)} (${fmtDev((FA-FP)/FP*100)})</span>`:''):'';
+  if(!blocks.length){el.innerHTML=`<div style="font-size:12px;color:var(--muted);padding:8px 0 2px;line-height:1.6">Plan your day: add blocks with a start time and an estimate. After you work, record the real start/end — the report shows how far off you were.</div>`;return;}
+  const rows=blocks.map(b=>{
+    const running=act.find(a=>a.planId===b.id);
+    const pe=min2hm((hm2min(b.pStart)||0)+b.pMin);
+    const proj=b.projId?projById(b.projId):null;
+    let right='',sub=proj&&proj.name!==b.title?escapeHtml(proj.name)+(b.ptype?' · ':''):'';
+    sub+=b.ptype?escapeHtml(b.ptype):'';
+    if(running){
+      const e=Math.round(elMin(running.start));
+      right=`<div style="text-align:right"><div style="font-size:12px;font-weight:700;color:${e>b.pMin?'#e0524d':'var(--work)'}">⏱ ${fmt(e)} / ${fmt(b.pMin)}</div><button class="plan-mini" style="width:auto;padding:0 10px;margin-top:3px;font-size:11px;font-weight:700" onclick="event.stopPropagation();toggleWork('${b.wtype||'design'}')">■ Stop</button></div>`;
+    }else if(b.aMin!=null){
+      const dv=blockDev(b);
+      right=`<div style="text-align:right"><div style="font-size:13px;font-weight:700;color:${devColor(dv)}">${fmt(b.aMin)} <span style="font-size:10px">${fmtDev(dv)}</span></div><div style="font-size:9px;color:var(--muted)">${b.aStart}–${b.aEnd}</div></div>`;
+    }else if(date===today){
+      right=`<button class="plan-mini" style="width:auto;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--work);border-color:var(--work)" onclick="event.stopPropagation();startPlanBlock('${b.id}')">▶ Start</button>`;
+    }else right=`<span style="font-size:11px;color:var(--muted)">${fmt(b.pMin)}</span>`;
+    return `<div onclick="showPlanModal('${b.id}')" style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer">
+      <div style="width:42px;flex-shrink:0;font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);line-height:1.4">${b.pStart}<br>${pe}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:14px;color:var(--text);word-break:break-word">${escapeHtml(b.title)}</div>${sub?`<div style="font-size:10px;color:var(--muted);margin-top:1px">${sub}</div>`:''}</div>
+      <div style="flex-shrink:0">${right}</div></div>`;
+  }).join('');
+  el.innerHTML=planTimeline(blocks,date)+rows;
+}
+
+// ---------- Add / edit block ----------
+function showPlanModal(id){
+  const b=id?liveItems(S.plan).find(x=>x.id===id):null;
+  if(id&&!b)return;
+  const projs=liveItems(S.projects).filter(p=>!p.done||(b&&b.projId===p.id));
+  const types=S.projectTypes||[];
+  const date=b?b.date:pDate(),start=b?b.pStart:suggestStart(date),mins=b?b.pMin:60;
+  const sel=(a,c)=>a===c?' selected':'';
+  const running=b&&Object.values(S.active||{}).some(a=>a&&a.planId===b.id);
+  showModal(`<h3 style="color:var(--work)">${b?'✎ Edit block':'📋 New block'}</h3>
+  <label class="mlbl">What are you working on?</label>
+  <input type="text" id="pl-title" value="${escapeHtml(b?b.title:'')}" placeholder="e.g. Logo concepts" style="border-color:var(--work)">
+  <label class="mlbl">Project</label>
+  <select id="pl-proj" onchange="plProjChange()"><option value="">— none —</option>${projs.map(p=>`<option value="${p.id}"${sel(b&&b.projId,p.id)}>${escapeHtml(p.name)}</option>`).join('')}<option value="__new">＋ New project…</option></select>
+  <div id="pl-newproj" style="display:none"><div style="display:flex;gap:8px"><input type="text" id="pl-np-name" placeholder="Project name" style="flex:2"><input type="number" id="pl-np-est" placeholder="Total hrs" min="0" step="0.5" style="flex:1"></div></div>
+  <div style="display:flex;gap:8px">
+    <div style="flex:1;min-width:0"><label class="mlbl">Type</label><select id="pl-type" onchange="plRefresh()"><option value="">—</option>${types.map(t=>`<option value="${escapeHtml(t)}"${sel(b&&b.ptype,t)}>${escapeHtml(t)}</option>`).join('')}</select></div>
+    <div style="flex:1;min-width:0"><label class="mlbl">Counts as</label><select id="pl-wtype"><option value="design"${sel(b&&b.wtype,'design')}>Design</option><option value="games"${sel(b&&b.wtype,'games')}>Games</option><option value="clients"${sel(b&&b.wtype,'clients')}>Clients</option></select></div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <div style="flex:1;min-width:0"><label class="mlbl">Date</label><input type="date" id="pl-date" value="${date}"></div>
+    <div style="flex:1;min-width:0"><label class="mlbl">Start</label><input type="time" id="pl-start" value="${start}" oninput="plRefresh()"></div>
+  </div>
+  <label class="mlbl">Estimate</label>
+  <div>${[15,30,45,60,90,120,180].map(m=>`<button type="button" class="plan-chip" onclick="document.getElementById('pl-min').value=${m};plRefresh()">${m>=60?(m/60)+'h':m+'m'}</button>`).join('')}</div>
+  <div style="display:flex;gap:10px;align-items:center"><input type="number" id="pl-min" value="${mins}" min="5" step="5" oninput="plRefresh()" style="flex:1"><span id="pl-end" style="font-size:12px;color:var(--muted);flex:1"></span></div>
+  <div id="pl-hint" style="font-size:12px;color:var(--text);line-height:1.5;margin:-4px 0 8px"></div>
+  <details ${b&&(b.aStart||b.aEnd)?'open':''} style="margin-bottom:10px">
+    <summary style="font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;padding:4px 0">⏱ Actual time ${running?'(timer running)':'(fill in after you finish)'}</summary>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <div style="flex:1;min-width:0"><label class="mlbl">Actual start</label><input type="time" id="pl-astart" value="${b&&b.aStart?b.aStart:''}"><button type="button" class="plan-chip" onclick="document.getElementById('pl-astart').value=tsToHM(Date.now())">Now</button></div>
+      <div style="flex:1;min-width:0"><label class="mlbl">Actual end</label><input type="time" id="pl-aend" value="${b&&b.aEnd?b.aEnd:''}"><button type="button" class="plan-chip" onclick="document.getElementById('pl-aend').value=tsToHM(Date.now())">Now</button></div>
+    </div>
+    <label class="mlbl">Wasted (min)</label><input type="number" id="pl-wasted" min="0" value="${b&&b.wasted?b.wasted:''}" placeholder="0">
+  </details>
+  <div class="mbtns"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" style="background:var(--work);color:#1a1000" onclick="savePlanBlock(${b?`'${b.id}'`:''})">${b?'Save':'Add'}</button></div>
+  ${b?`<button class="bcanc" style="width:100%;margin-top:8px;border-color:#e0524d;color:#e0524d" onclick="deletePlanBlock('${b.id}')">🗑 Delete</button>`:''}`,null);
+  plRefresh();
+  if(!b)setTimeout(()=>document.getElementById('pl-title')?.focus(),80);
+}
+function plProjChange(){
+  const v=document.getElementById('pl-proj').value;
+  document.getElementById('pl-newproj').style.display=v==='__new'?'block':'none';
+  const p=v&&v!=='__new'?projById(v):null;
+  if(p){
+    const t=document.getElementById('pl-title');if(!t.value.trim())t.value=p.name;
+    if(p.ptype)document.getElementById('pl-type').value=p.ptype;
+  }
+  plRefresh();
+}
+function plRefresh(){
+  const g=i=>document.getElementById(i);if(!g('pl-min'))return;
+  const s=hm2min(g('pl-start').value),m=parseInt(g('pl-min').value)||0;
+  g('pl-end').textContent=(s!=null&&m)?'→ ends '+min2hm(s+m):'';
+  const t=g('pl-type').value,st=typeStats()[t],h=g('pl-hint');
+  if(st&&st.n>=2&&st.p>0&&m){
+    const r=st.a/st.p;
+    if(Math.abs(r-1)>0.1){
+      const sug=Math.max(5,Math.round(m*r/5)*5);
+      h.innerHTML=`💡 Your past “${escapeHtml(t||'untyped')}” blocks took <b>×${r.toFixed(2)}</b> of plan (${st.n} blocks). Try <a href="#" onclick="document.getElementById('pl-min').value=${sug};plRefresh();return false" style="color:var(--work);font-weight:700">${sug}m</a>`;
+      return;
+    }
+  }
+  h.innerHTML='';
+}
+function savePlanBlock(id){
+  const $=i=>document.getElementById(i);
+  let title=$('pl-title').value.trim(),projId=$('pl-proj').value;
+  if(!S.plan)S.plan=[];if(!S.projects)S.projects=[];
+  if(projId==='__new'){
+    const nm=$('pl-np-name').value.trim();
+    if(!nm){alert('Name the new project first.');return;}
+    const est=parseFloat($('pl-np-est').value);
+    const p={id:uid(),name:nm,ptype:$('pl-type').value||'',estMin:est>0?Math.round(est*60):0,done:false,deleted:false,created:new Date().toISOString(),updated:Date.now()};
+    S.projects.push(p);projId=p.id;if(!title)title=nm;
+  }
+  const proj=projId?projById(projId):null;
+  if(!title&&proj)title=proj.name;
+  if(!title){alert('Give this block a title.');return;}
+  const f={
+    title,projId:projId||null,ptype:$('pl-type').value||'',wtype:$('pl-wtype').value||'design',
+    date:$('pl-date').value||pDate(),pStart:$('pl-start').value||'09:00',pMin:Math.max(5,parseInt($('pl-min').value)||60),
+    aStart:$('pl-astart').value||null,aEnd:$('pl-aend').value||null,wasted:parseFloat($('pl-wasted').value)||0
+  };
+  f.aMin=(f.aStart&&f.aEnd)?actMinOf(f):null;
+  let b=id?S.plan.find(x=>x.id===id):null;
+  if(b)Object.assign(b,f);
+  else{b={id:uid(),gcalP:null,gcalA:null,deleted:false,created:new Date().toISOString(),...f};S.plan.push(b);}
+  touchP(b);
+  closeModal();plannerChanged();
+  if(S.gcalAuto)gcalPushBlock(b).catch(e=>console.warn('gcal',e));
+}
+function deletePlanBlock(id){
+  const b=liveItems(S.plan).find(x=>x.id===id);if(!b)return;
+  if(Object.values(S.active||{}).some(a=>a&&a.planId===id)){alert('Stop the timer for this block first.');return;}
+  b.deleted=true;touchP(b);
+  closeModal();plannerChanged();
+  gcalDeleteBlock(b).catch(()=>{});
+}
+function startPlanBlock(id){
+  const b=liveItems(S.plan).find(x=>x.id===id);if(!b)return;
+  const type=b.wtype||'design';
+  const other=WTYPES.find(t=>S.active['w_'+t]);
+  if(other){alert('Stop '+other+' first!');return;}
+  const proj=(b.projId&&projById(b.projId)?projById(b.projId).name:b.title);
+  S.active['w_'+type]={start:nowTs(),proj,ptype:b.ptype||'',planId:b.id};
+  addRecentSession(b.ptype||'',proj);
+  b.aStart=tsToHM(nowTs());b.aEnd=null;b.aMin=null;b.wasted=0;touchP(b);
+  save();updateWorkUI();syncActiveToFirestore();plannerChanged();
+}
+function finishPlanBlock(id,startTs,wst){
+  const b=liveItems(S.plan).find(x=>x.id===id);if(!b)return;
+  b.aStart=tsToHM(startTs);b.aEnd=tsToHM(nowTs());b.wasted=wst||0;b.aMin=actMinOf(b);
+  touchP(b);plannerChanged();
+  if(S.gcalAuto)gcalPushBlock(b).catch(e=>console.warn('gcal',e));
+}
+// Overrun alert: running planned block passes its estimate
+setInterval(()=>{try{
+  WTYPES.forEach(t=>{
+    const a=S.active['w_'+t];if(!a||!a.planId||a.overNotified)return;
+    const b=liveItems(S.plan).find(x=>x.id===a.planId);if(!b)return;
+    if(elMin(a.start)>=b.pMin){a.overNotified=true;save();sendNotif('⏰ Estimate reached',b.title+' — planned '+fmt(b.pMin)+' is up. Wrap up or re-estimate.','plan-over-'+b.id);}
+  });
+}catch(e){}},20000);
+
+// ---------- Projects ----------
+function showProjectsModal(){
+  const ps=liveItems(S.projects).sort((a,b)=>((a.done?1:0)-(b.done?1:0))||a.name.localeCompare(b.name));
+  const rows=ps.map(p=>{
+    const act=projActualMin(p),pct=p.estMin?Math.round(act/p.estMin*100):null;
+    const over=p.estMin&&act>p.estMin;
+    return `<div onclick="showProjectModal('${p.id}')" style="padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer;${p.done?'opacity:.5':''}">
+      <div style="display:flex;justify-content:space-between;gap:8px;font-size:14px"><span>${p.done?'✓ ':''}${escapeHtml(p.name)}${p.ptype?` <span style="font-size:10px;color:var(--muted)">${escapeHtml(p.ptype)}</span>`:''}</span><span style="font-size:12px;color:${over?'#e0524d':'var(--muted)'};white-space:nowrap">${fmt(act)}${p.estMin?' / '+fmt(p.estMin)+' · '+pct+'%':''}</span></div>
+      <div style="margin-top:5px">${estBar(act,p.estMin)}</div></div>`;
+  }).join('')||'<div style="font-size:12px;color:var(--muted);padding:8px 0">No projects yet. A project holds a total estimate — every block you link to it adds up against it.</div>';
+  showModal(`<h3 style="color:var(--work)">📁 Projects</h3><div style="max-height:50vh;overflow-y:auto">${rows}</div>
+    <div class="mbtns" style="margin-top:12px"><button class="bcanc" onclick="closeModal()">Close</button><button class="bconf" style="background:var(--work);color:#1a1000" onclick="showProjectModal()">＋ New</button></div>`,null);
+}
+function showProjectModal(id){
+  const p=id?projById(id):null;if(id&&!p)return;
+  const types=S.projectTypes||[];
+  showModal(`<h3 style="color:var(--work)">${p?'✎ Edit project':'📁 New project'}</h3>
+    <label class="mlbl">Name</label><input type="text" id="pj-name" value="${escapeHtml(p?p.name:'')}" placeholder="e.g. Client A — brand identity" style="border-color:var(--work)">
+    <label class="mlbl">Type</label><select id="pj-type"><option value="">—</option>${types.map(t=>`<option value="${escapeHtml(t)}"${p&&p.ptype===t?' selected':''}>${escapeHtml(t)}</option>`).join('')}</select>
+    <label class="mlbl">Total estimate (hours)</label><input type="number" id="pj-est" min="0" step="0.5" value="${p&&p.estMin?+(p.estMin/60).toFixed(2):''}" placeholder="e.g. 12">
+    ${p?`<label style="display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:700;margin:4px 0 10px">Mark as finished <input type="checkbox" id="pj-done" ${p.done?'checked':''} style="width:18px;height:18px;margin:0;accent-color:var(--work)"></label>`:''}
+    <div class="mbtns"><button class="bcanc" onclick="showProjectsModal()">Back</button><button class="bconf" style="background:var(--work);color:#1a1000" onclick="saveProject(${p?`'${p.id}'`:''})">Save</button></div>
+    ${p?`<button class="bcanc" style="width:100%;margin-top:8px;border-color:#e0524d;color:#e0524d" onclick="deleteProject('${p.id}')">🗑 Delete project</button>`:''}`,null);
+}
+function saveProject(id){
+  const name=document.getElementById('pj-name').value.trim();
+  if(!name){alert('Name the project.');return;}
+  if(!S.projects)S.projects=[];
+  const est=parseFloat(document.getElementById('pj-est').value);
+  const f={name,ptype:document.getElementById('pj-type').value||'',estMin:est>0?Math.round(est*60):0,done:!!document.getElementById('pj-done')?.checked};
+  let p=id?S.projects.find(x=>x.id===id):null;
+  if(p)Object.assign(p,f);else{p={id:uid(),deleted:false,created:new Date().toISOString(),...f};S.projects.push(p);}
+  touchP(p);plannerChanged();showProjectsModal();
+}
+function deleteProject(id){
+  const p=S.projects.find(x=>x.id===id);if(!p)return;
+  p.deleted=true;touchP(p);
+  liveItems(S.plan).forEach(b=>{if(b.projId===id){b.projId=null;touchP(b);}});
+  plannerChanged();showProjectsModal();
+}
+
+// ---------- Report: Plan vs Actual ----------
+let pvaTab='proj',pvaPer='week',pvaOpen=false;
+function pvaToggle(){pvaOpen=!pvaOpen;renderPva();}
+function pvaSet(t){pvaTab=t;pvaOpen=true;renderPva();}
+function pvaPeriod(p){pvaPer=p;renderPva();}
+function weekKey(ds){
+  const [y,m,d]=ds.split('-').map(Number);
+  const dow=new Date(Date.UTC(y,m-1,d)).getUTCDay();
+  const diff=(dow-(S.weekStart||0)+7)%7;
+  return new Date(Date.UTC(y,m-1,d-diff)).toISOString().slice(0,10);
+}
+function devBar(dev){
+  const col=devColor(dev);
+  return `<div style="position:relative;height:6px;background:var(--bg4);border-radius:99px;margin-top:4px"><div style="position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--muted);opacity:.5"></div><div style="position:absolute;top:0;bottom:0;${dev>=0?'left:50%':'right:50%'};width:${Math.min(50,Math.abs(dev)/2)}%;background:${col};border-radius:99px"></div></div>`;
+}
+function renderPva(){
+  const body=document.getElementById('pva-body'),sum=document.getElementById('pva-sum');
+  if(!body)return;
+  const done=liveItems(S.plan).filter(b=>b.aMin!=null&&b.pMin>0);
+  const P=done.reduce((s,b)=>s+b.pMin,0),A=done.reduce((s,b)=>s+b.aMin,0);
+  const overP=liveItems(S.projects).filter(p=>!p.done&&p.estMin&&projActualMin(p)>p.estMin).length;
+  if(sum)sum.innerHTML=(done.length?`${done.length} blocks · <b style="color:${devColor((A-P)/P*100)}">${fmtDev((A-P)/P*100)}</b> vs plan`:'No finished blocks yet')+(overP?` · <span style="color:#e0524d">⚠ ${overP} over budget</span>`:'');
+  const arrow=document.getElementById('pva-arrow');if(arrow)arrow.textContent=pvaOpen?'▴':'▾';
+  const wrap=document.getElementById('pva-content');if(wrap)wrap.style.display=pvaOpen?'block':'none';
+  ['proj','acc','type'].forEach(t=>{const e=document.getElementById('pva-t-'+t);if(e)e.classList.toggle('on',pvaTab===t);});
+  if(!pvaOpen)return;
+  const empty=m=>`<div style="font-size:12px;color:var(--muted);padding:10px 0;line-height:1.6">${m}</div>`;
+  if(pvaTab==='proj'){
+    const ps=liveItems(S.projects).map(p=>({p,act:projActualMin(p)}))
+      .sort((a,b)=>((a.p.done?1:0)-(b.p.done?1:0))||((b.p.estMin?b.act/b.p.estMin:0)-(a.p.estMin?a.act/a.p.estMin:0)));
+    body.innerHTML=ps.length?ps.map(({p,act})=>{
+      const pct=p.estMin?act/p.estMin*100:null,over=p.estMin&&act>p.estMin;
+      return `<div style="padding:9px 0;border-bottom:1px solid var(--border);${p.done?'opacity:.55':''}">
+        <div style="display:flex;justify-content:space-between;gap:8px;font-size:14px"><span>${p.done?'✓ ':''}${escapeHtml(p.name)}</span><span style="font-size:12px;color:var(--muted);white-space:nowrap">${fmt(act)}${p.estMin?' / '+fmt(p.estMin):''}</span></div>
+        <div style="margin:5px 0 3px">${estBar(act,p.estMin)}</div>
+        <div style="font-size:11px;color:${over?'#e0524d':'var(--muted)'}">${p.estMin?(over?`⚠ Over by ${fmt(act-p.estMin)} (${Math.round(pct)}%)`:`${Math.round(pct)}% used · ${fmt(p.estMin-act)} left`):'No estimate set'}</div></div>`;
+    }).join(''):empty('No projects yet — add one from the Plan card on the Work page (📁 Projects).');
+  }else if(pvaTab==='acc'){
+    const groups={};
+    done.forEach(b=>{const k=pvaPer==='week'?weekKey(b.date):b.date.slice(0,7);const g=groups[k]||(groups[k]={p:0,a:0,n:0});g.p+=b.pMin;g.a+=b.aMin;g.n++;});
+    const keys=Object.keys(groups).sort().reverse().slice(0,pvaPer==='week'?8:6);
+    const hit=done.filter(b=>Math.abs(blockDev(b))<=15).length;
+    const bias=done.length?(A-P)/P*100:0;
+    const head=done.length?`<div style="font-size:13px;line-height:1.6;margin-bottom:8px">${Math.abs(bias)<=5?'Your estimates are well calibrated.':bias>0?`You tend to <b>under-estimate</b> — work takes ~${Math.round(bias)}% longer than planned.`:`You tend to <b>over-estimate</b> — work finishes ~${Math.round(-bias)}% faster than planned.`} <span style="color:var(--muted)">${Math.round(hit/done.length*100)}% of blocks landed within ±15%.</span></div>`:'';
+    body.innerHTML=`<div style="display:flex;gap:6px;margin-bottom:8px"><button class="pva-tab${pvaPer==='week'?' on':''}" onclick="pvaPeriod('week')">Weekly</button><button class="pva-tab${pvaPer==='month'?' on':''}" onclick="pvaPeriod('month')">Monthly</button></div>${head}`+
+      (keys.length?keys.map(k=>{const g=groups[k],dv=(g.a-g.p)/g.p*100;return `<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${pvaPer==='week'?'Wk of '+fmtDueDate(k):fmtMo(k)} <span style="font-size:10px;color:var(--muted)">${g.n} blocks</span></span><span style="font-weight:700;color:${devColor(dv)}">${fmtDev(dv)}</span></div><div style="font-size:10px;color:var(--muted)">Plan ${fmt(g.p)} · Actual ${fmt(g.a)}</div>${devBar(dv)}</div>`;}).join(''):empty('Finish a few planned blocks (with actual start/end) and accuracy shows up here.'));
+  }else{
+    const st=typeStats(),ks=Object.keys(st).sort((a,b)=>st[b].n-st[a].n);
+    body.innerHTML=ks.length?ks.map(k=>{
+      const o=st[k],r=o.a/o.p,avgP=o.p/o.n,avgA=o.a/o.n,sug=Math.max(5,Math.round(60*r/5)*5);
+      return `<div style="padding:9px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;font-size:14px"><span>${escapeHtml(k||'Untyped')} <span style="font-size:10px;color:var(--muted)">${o.n} block${o.n>1?'s':''}${o.n<3?' · low confidence':''}</span></span><span style="font-weight:700;color:${devColor((r-1)*100)}">×${r.toFixed(2)}</span></div><div style="font-size:11px;color:var(--muted);margin-top:2px">Avg planned ${fmt(avgP)} → avg actual ${fmt(avgA)}${Math.abs(r-1)>.1?` · plan 60m ≈ expect ${fmt(sug)}`:' · spot on'}</div></div>`;
+    }).join(''):empty('No data yet. Once blocks have a type and an actual time, you will see average time per type and a correction factor for your estimates.');
+  }
+}
+
+// ---------- Google Calendar ----------
+function blockUtcMs(date,hm,addDays){const[y,m,d]=date.split('-').map(Number);const[h,mi]=hm.split(':').map(Number);return Date.UTC(y,m-1,d+(addDays||0),h,mi)-getTZOffset()*3600000;}
+function blockRange(b,actual){
+  if(!actual){const s=blockUtcMs(b.date,b.pStart);return[s,s+b.pMin*60000];}
+  const s=blockUtcMs(b.date,b.aStart);let e=blockUtcMs(b.date,b.aEnd);if(e<=s)e+=864e5;return[s,e];
+}
+const _icsT=ms=>new Date(ms).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
+function gcalDesc(b,actual){return actual?`Actual ${fmt(b.aMin||0)} · planned ${fmt(b.pMin)}`:`Planned · estimate ${fmt(b.pMin)}`;}
+function gcalLink(b,actual){
+  const[s,e]=blockRange(b,actual);
+  return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent((actual?'✅ ':'📋 ')+b.title)+'&dates='+_icsT(s)+'/'+_icsT(e)+'&details='+encodeURIComponent(gcalDesc(b,actual));
+}
+function downloadIcs(date){
+  const esc=s=>String(s).replace(/\\/g,'\\\\').replace(/[,;]/g,m=>'\\'+m).replace(/\n/g,'\\n');
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//OWLF//Plan vs Actual//EN','CALSCALE:GREGORIAN'];
+  const stamp=_icsT(Date.now());
+  liveItems(S.plan).filter(b=>b.date===date).forEach(b=>{
+    const ev=(actual)=>{const[s,e]=blockRange(b,actual);L.push('BEGIN:VEVENT','UID:'+b.id+(actual?'-a':'-p')+'@owlf','DTSTAMP:'+stamp,'DTSTART:'+_icsT(s),'DTEND:'+_icsT(e),'SUMMARY:'+esc((actual?'✅ ':'📋 ')+b.title+(actual?' (actual)':'')),'DESCRIPTION:'+esc(gcalDesc(b,actual)),'END:VEVENT');};
+    ev(false);if(b.aStart&&b.aEnd&&b.aMin!=null)ev(true);
+  });
+  L.push('END:VCALENDAR');
+  const blob=new Blob([L.join('\r\n')],{type:'text/calendar'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='owlf-plan-'+date+'.ics';
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+}
+function gcalToken(){try{const t=JSON.parse(sessionStorage.getItem('owlf_gcal')||'null');if(t&&t.exp>Date.now()+60000)return t.tok;}catch(e){}return null;}
+async function gcalConnect(){
+  if(typeof auth==='undefined'||!auth.currentUser){alert('Sign in with Google first (Settings).');return false;}
+  try{
+    const p=new firebase.auth.GoogleAuthProvider();
+    p.addScope('https://www.googleapis.com/auth/calendar.events');
+    const r=await auth.currentUser.reauthenticateWithPopup(p);
+    const tok=r.credential&&r.credential.accessToken;
+    if(!tok)throw new Error('Google did not return an access token');
+    sessionStorage.setItem('owlf_gcal',JSON.stringify({tok,exp:Date.now()+55*60000}));
+    S.gcalAuto=true;save();showCalModal();return true;
+  }catch(e){alert('Calendar connect failed: '+e.message);return false;}
+}
+async function gcalReq(method,path,body){
+  const tok=gcalToken();if(!tok)throw new Error('NOAUTH');
+  const r=await fetch('https://www.googleapis.com/calendar/v3/'+path,{method,headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
+  if(r.status===401){sessionStorage.removeItem('owlf_gcal');throw new Error('NOAUTH');}
+  if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,200));
+  return r.status===204?null:r.json();
+}
+async function gcalPushBlock(b){
+  if(!gcalToken())return;
+  const one=async actual=>{
+    const[s,e]=blockRange(b,actual),key=actual?'gcalA':'gcalP';
+    const body={summary:(actual?'✅ ':'📋 ')+b.title+(actual?' (actual)':''),description:gcalDesc(b,actual)+'\nOWLF Time Log',start:{dateTime:new Date(s).toISOString()},end:{dateTime:new Date(e).toISOString()},colorId:actual?'10':'8',extendedProperties:{private:{owlfId:b.id,kind:actual?'actual':'plan'}}};
+    let res;
+    if(b[key]){
+      try{res=await gcalReq('PATCH','calendars/primary/events/'+b[key],body);}
+      catch(err){if(/^(404|410)/.test(err.message))res=await gcalReq('POST','calendars/primary/events',body);else throw err;}
+    }else res=await gcalReq('POST','calendars/primary/events',body);
+    if(res&&res.id&&b[key]!==res.id){b[key]=res.id;return true;}
+    return false;
+  };
+  let ch=await one(false);
+  if(b.aStart&&b.aEnd&&b.aMin!=null)ch=(await one(true))||ch;
+  if(ch){touchP(b);plannerChanged();}
+}
+async function gcalDeleteBlock(b){
+  if(!gcalToken())return;
+  for(const k of['gcalP','gcalA'])if(b[k]){try{await gcalReq('DELETE','calendars/primary/events/'+b[k]);}catch(e){}}
+}
+async function gcalPushDay(){
+  const date=pDate(),bs=liveItems(S.plan).filter(b=>b.date===date);
+  if(!gcalToken()){alert('Calendar session expired — tap Connect again.');return;}
+  const btn=document.getElementById('gcal-push-btn');if(btn){btn.disabled=true;btn.textContent='Syncing…';}
+  try{for(const b of bs)await gcalPushBlock(b);alert('Synced '+bs.length+' block(s) to Google Calendar.');}
+  catch(e){alert(e.message==='NOAUTH'?'Calendar session expired — tap Connect again.':'Calendar sync failed: '+e.message);}
+  showCalModal();
+}
+function gcalAutoToggle(){S.gcalAuto=!!document.getElementById('gcal-auto').checked;save();}
+function showCalModal(){
+  const date=pDate(),bs=liveItems(S.plan).filter(b=>b.date===date).sort((a,b)=>(hm2min(a.pStart)||0)-(hm2min(b.pStart)||0));
+  const on=!!gcalToken();
+  const links=bs.map(b=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.pStart} ${escapeHtml(b.title)}</span><span style="flex-shrink:0"><a href="${gcalLink(b,false)}" target="_blank" rel="noopener" style="color:var(--work);font-weight:700;margin-right:10px">Plan</a>${b.aStart&&b.aEnd&&b.aMin!=null?`<a href="${gcalLink(b,true)}" target="_blank" rel="noopener" style="color:var(--work);font-weight:700">Actual</a>`:''}</span></div>`).join('')||'<div style="font-size:12px;color:var(--muted);padding:6px 0">No blocks on this day yet.</div>';
+  showModal(`<h3 style="color:var(--work)">📅 Google Calendar</h3>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Day: <b style="color:var(--text)">${fmtDueDate(date)}</b> — change it with ‹ › on the Plan card.</div>
+    <div style="font-size:13px;font-weight:700;margin-bottom:4px">Auto-sync ${on?'<span style="color:#3fa66b">● connected</span>':'<span style="color:var(--muted)">○ not connected</span>'}</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px">Planned blocks appear as grey events, finished blocks add a green “actual” event. Edits and deletes follow. Google sessions last about an hour, so you may need to tap Connect again.</div>
+    ${on?`<label style="display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:8px">Push automatically when I save <input type="checkbox" id="gcal-auto" ${S.gcalAuto?'checked':''} onchange="gcalAutoToggle()" style="width:18px;height:18px;margin:0;accent-color:var(--work)"></label>
+    <button id="gcal-push-btn" class="plan-btn pri" style="width:100%;margin-bottom:12px" onclick="gcalPushDay()">⬆ Push this day now</button>`:`<button class="plan-btn pri" style="width:100%;margin-bottom:12px" onclick="gcalConnect()">Connect Google Calendar</button>`}
+    <div style="font-size:13px;font-weight:700;margin-bottom:4px">No setup needed</div>
+    <button class="plan-btn" style="width:100%;margin-bottom:6px" onclick="downloadIcs('${date}')">⬇ Download this day (.ics)</button>
+    <div style="max-height:26vh;overflow-y:auto">${links}</div>
+    <div class="mbtns" style="margin-top:12px"><button class="bcanc" onclick="closeModal()">Close</button></div>`,null);
+}
 
 // ═══ AI TASKS (repeat-daily to-do list with cooldowns) ═══
 function fmtCountdown(ms){
@@ -3091,8 +3616,8 @@ function checkTodoReminders(){
   if(changed)todosChanged();
 }
 setInterval(checkTodoReminders,20000);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(typeof syncTodos==='function')syncTodos();checkTodoReminders();}});
-window.addEventListener('online',()=>{if(typeof syncTodos==='function')syncTodos();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(typeof syncTodos==='function')syncTodos();if(typeof syncPlanner==='function')syncPlanner();checkTodoReminders();}});
+window.addEventListener('online',()=>{if(typeof syncTodos==='function')syncTodos();if(typeof syncPlanner==='function')syncPlanner();});
 // Tapping "✓ Done" on the OS notification completes the to-do here too
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message',e=>{
@@ -3143,6 +3668,7 @@ function importData(e){
 function updateWorkUI(){
   calcWorkStreak();
   renderAiTasks();
+  if(typeof renderPlanCard==='function')renderPlanCard();
   const d=getToday();
   // Reconcile: if daily totals are 0 but sessions exist, recalculate from sessions
   const todaySessions=S.sessions[tk()]||[];
@@ -3669,6 +4195,7 @@ function switchReport(mode){
 // ── CALENDAR HELPERS ─────────────────────────────────────────────────────────
 
 function renderReport(){
+  if(typeof renderPva==='function')renderPva();
   // Ratio bar
   const barEl=document.getElementById('report-ratio-bar');
   if(barEl){

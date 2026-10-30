@@ -1,0 +1,18 @@
+{
+  "name": "owlf-timelog",
+  "version": "4.8.0",
+  "private": true,
+  "description": "OWLF time log — web app + Capacitor Android wrapper",
+  "scripts": {
+    "build:www": "node scripts/build-www.mjs",
+    "android:prepare": "node scripts/build-www.mjs && (test -d android || npx cap add android) && node scripts/apply-native.mjs && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor-firebase/authentication": "^8.5.2",
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "firebase": "10.12.0"
+  }
+}

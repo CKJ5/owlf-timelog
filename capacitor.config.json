@@ -1,0 +1,14 @@
+{
+  "appId": "com.ckj5.owlf",
+  "appName": "OWLF",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com"]
+    }
+  }
+}

@@ -3079,6 +3079,10 @@ async function renderNativeSettings(){
     row(s.overlay,'Pop up over other apps (full-screen reminders)','Allow','overlay')+
     row(s.fullScreen,'Full-screen notifications','Allow','fullScreen')+
     row(s.battery,'Unrestricted battery (reliable alarms)','Allow','battery')+
+    (/xiaomi|redmi|poco/.test(s.maker||'')?
+      row(false,'Xiaomi: turn ON Autostart for OWLF (without it reminders never fire once the app is closed)','Open','miuiAutostart')+
+      row(false,'Xiaomi: allow “Display pop-up windows while running in the background” and “Show on lock screen”','Open','miuiPerms')+
+      '<div style="font-size:11px;color:var(--muted);padding:6px 0">Also: Settings → Battery → OWLF → No restrictions, and in Recents lock the OWLF card (pull it down / lock icon) so it is not cleaned.</div>':'')+
     `<div style="display:flex;gap:8px;margin-top:10px"><button class="plan-btn" onclick="nativePinWidget()">＋ Add widget</button><button class="plan-btn" onclick="nativeTestAlarm()">🔔 Test reminder</button></div><div style="display:flex;gap:8px;margin-top:8px"><button class="plan-btn" onclick="nativeShowNow()">▶ Show now</button><button class="plan-btn" onclick="nativeDiag()">🔍 Diagnose</button></div>`;
 }
 function nativeFix(kind){

@@ -121,6 +121,7 @@ public class OwlfPlugin extends Plugin {
         r.put("battery", pm.isIgnoringBatteryOptimizations(c.getPackageName()));
         AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
         r.put("exactAlarm", Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms());
+        r.put("maker", Build.MANUFACTURER == null ? "" : Build.MANUFACTURER.toLowerCase());
         call.resolve(r);
     }
 
@@ -160,6 +161,15 @@ public class OwlfPlugin extends Plugin {
             case "battery":
                 i = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
                 break;
+            case "miuiAutostart": // Xiaomi / Redmi / POCO: without this, alarms cannot start the app once it is closed
+                i = new Intent().setComponent(new ComponentName("com.miui.securitycenter",
+                        "com.miui.permcenter.autostart.AutoStartManagementActivity"));
+                break;
+            case "miuiPerms": // "Display pop-up windows while running in the background", "Show on lock screen"
+                i = new Intent("miui.intent.action.APP_PERM_EDITOR")
+                        .setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
+                        .putExtra("extra_pkgname", pkg);
+                break;
             default:
                 i = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, pkg);
         }
@@ -168,6 +178,16 @@ public class OwlfPlugin extends Plugin {
             c.startActivity(i);
             call.resolve();
         } catch (Exception e) {
+            if (kind.startsWith("miui")) {
+                // Newer HyperOS builds moved these screens: fall back to the app's info page (Permissions are in there).
+                try {
+                    c.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + pkg))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    call.resolve();
+                    return;
+                } catch (Exception ignored) {
+                }
+            }
             call.reject("Cannot open settings: " + e.getMessage());
         }
     }

@@ -1098,6 +1098,11 @@ function installPWA(){
       <button onclick="document.getElementById('settings-overlay').classList.add('hidden')" style="background:var(--bg3);border:1px solid var(--border);border-radius:50%;width:28px;height:28px;font-size:14px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
 
+    <div id="native-settings" style="display:none;margin-bottom:14px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg3)">
+      <div class="mlbl" style="margin-bottom:6px">📱 Android app <span style="font-weight:400;color:var(--muted)">· v__APP_VERSION__</span></div>
+      <div id="native-settings-body"></div>
+    </div>
+
     <!-- GROUP: Appearance -->
     <div class="set-group">
       <div class="set-group-hdr" onclick="toggleSetGroup('sg-appearance')">
@@ -1150,10 +1155,6 @@ function installPWA(){
           <div class="mlbl" style="margin:10px 0 6px">Default rest between sets (seconds)</div>
           <input type="number" id="rest-def-inp" value="90" min="10" max="600" step="5" onchange="saveRestDefault()" style="width:100%;background:var(--bg3);border:1px solid var(--ex);border-radius:8px;padding:10px 12px;color:var(--text);font-size:14px">
           <div style="font-size:11px;color:var(--muted);margin-top:4px">Switching unit only changes how weights are shown — your saved data stays exact.</div>
-        </div>
-        <div id="native-settings" style="display:none;margin-bottom:12px">
-          <div class="mlbl" style="margin-bottom:6px">Android app</div>
-          <div id="native-settings-body"></div>
         </div>
         <div>
           <div class="mlbl" style="margin-bottom:6px">Medal Target (perfect days/month)</div>

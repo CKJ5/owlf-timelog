@@ -8,6 +8,8 @@ fs.rmSync(www, { recursive: true, force: true });
 fs.mkdirSync(path.join(www, 'vendor'), { recursive: true });
 
 let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const appVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+html = html.replaceAll('__APP_VERSION__', appVersion);   // shown in the app's Android settings block
 let replaced = 0;
 for (const n of ['app', 'auth', 'firestore']) {
   const cdn = `https://www.gstatic.com/firebasejs/10.12.0/firebase-${n}-compat.js`;

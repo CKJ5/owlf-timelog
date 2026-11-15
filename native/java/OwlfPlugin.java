@@ -1,6 +1,7 @@
 package com.ckj5.owlf;
 
 import android.app.AlarmManager;
+import android.app.NotificationChannel;
 import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.content.ContentValues;
@@ -67,6 +68,32 @@ public class OwlfPlugin extends Plugin {
     public void setAlarms(PluginCall call) {
         JSArray arr = call.getArray("alarms");
         Alarms.replaceAll(getContext(), arr == null ? new JSONArray() : arr);
+        JSObject r = new JSObject();
+        r.put("count", Alarms.count(getContext()));
+        r.put("next", Alarms.nextAt(getContext()));
+        call.resolve(r);
+    }
+
+    /** Everything needed to tell why a reminder did not show up. */
+    @PluginMethod
+    public void getDiag(PluginCall call) {
+        Context c = getContext();
+        JSObject r = new JSObject();
+        r.put("sdk", Build.VERSION.SDK_INT);
+        r.put("device", Build.MANUFACTURER + " " + Build.MODEL);
+        r.put("notifications", Notifs.nm(c).areNotificationsEnabled());
+        NotificationChannel ch = Notifs.nm(c).getNotificationChannel(Notifs.CH_REMINDER);
+        r.put("channelImportance", ch == null ? -1 : ch.getImportance());
+        r.put("count", Alarms.count(c));
+        r.put("next", Alarms.nextAt(c));
+        r.put("log", Prefs.logLines(c));
+        call.resolve(r);
+    }
+
+    /** Fire a reminder right now, to separate "can it display?" from "was it scheduled?". */
+    @PluginMethod
+    public void testNow(PluginCall call) {
+        AlarmReceiver.fire(getContext(), "test:now", "Test reminder", "Shown immediately by the Show now button.", "test", "", System.currentTimeMillis());
         call.resolve();
     }
 

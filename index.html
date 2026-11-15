@@ -3012,7 +3012,7 @@ function scheduleNativeAlarms(force){
     list.sort((a,b)=>a.at-b.at);
     const capped=list.slice(0,200),sig=JSON.stringify(capped);
     if(!force&&sig===_alSig)return;
-    _alSig=sig;OwlfN.setAlarms({alarms:capped}).catch(()=>{});
+    _alSig=sig;const p=OwlfN.setAlarms({alarms:capped});p.catch(()=>{});return p;
   }catch(e){console.warn('scheduleNativeAlarms',e);}
 }
 function nativeSaveHook(){
@@ -3079,17 +3079,33 @@ async function renderNativeSettings(){
     row(s.overlay,'Pop up over other apps (full-screen reminders)','Allow','overlay')+
     row(s.fullScreen,'Full-screen notifications','Allow','fullScreen')+
     row(s.battery,'Unrestricted battery (reliable alarms)','Allow','battery')+
-    `<div style="display:flex;gap:8px;margin-top:10px"><button class="plan-btn" onclick="nativePinWidget()">＋ Add widget</button><button class="plan-btn" onclick="nativeTestAlarm()">🔔 Test reminder</button></div>`;
+    `<div style="display:flex;gap:8px;margin-top:10px"><button class="plan-btn" onclick="nativePinWidget()">＋ Add widget</button><button class="plan-btn" onclick="nativeTestAlarm()">🔔 Test reminder</button></div><div style="display:flex;gap:8px;margin-top:8px"><button class="plan-btn" onclick="nativeShowNow()">▶ Show now</button><button class="plan-btn" onclick="nativeDiag()">🔍 Diagnose</button></div>`;
 }
 function nativeFix(kind){
   if(kind==='notifications')OwlfN.requestNotifications().then(()=>renderNativeSettings());
   else OwlfN.openSettings({kind}).catch(e=>alert(e.message));
 }
 function nativePinWidget(){OwlfN.pinWidget().catch(e=>alert(e.message));}
-function nativeTestAlarm(){
+async function nativeTestAlarm(){
   _testAlarm={id:'test:'+Date.now(),title:'Test reminder',body:'If you can see this full screen, reminders work.',at:Date.now()+10000,kind:'test',ref:''};
-  scheduleNativeAlarms(true);
-  alert('A test reminder fires in 10 seconds. Press Home or lock the phone to see the full-screen version.');
+  try{
+    const r=await scheduleNativeAlarms(true);
+    alert(r&&r.count?'Scheduled. The test reminder fires in 10 seconds — press Home or lock the phone. If nothing appears, tap "Diagnose".':'The phone did NOT schedule it (0 reminders). Tap "Diagnose" and send me what it says.');
+  }catch(e){alert('Could not schedule: '+(e&&e.message||e));}
+}
+async function nativeShowNow(){
+  try{await OwlfN.testNow();}catch(e){alert('Could not show: '+(e&&e.message||e));}
+}
+async function nativeDiag(){
+  try{
+    const d=await OwlfN.getDiag(),s=await OwlfN.getStatus();
+    const t=ms=>ms?new Date(ms).toLocaleString():'none';
+    const imp={'-1':'missing','0':'blocked','1':'min','2':'low','3':'default','4':'high (good)','5':'max'}[String(d.channelImportance)]||d.channelImportance;
+    alert(['Phone: '+d.device+' · Android API '+d.sdk,
+      'Notifications allowed: '+d.notifications,'Reminder channel: '+imp,
+      'Overlay allowed: '+s.overlay+' · Full-screen allowed: '+s.fullScreen,'Battery unrestricted: '+s.battery,
+      'Scheduled reminders: '+d.count+' · next: '+t(d.next),'','Recent events:'].concat((d.log||[]).slice(-8)).join('\n'));
+  }catch(e){alert('Diagnose failed: '+(e&&e.message||e));}
 }
 if(NATIVE&&OwlfN){
   OwlfN.addListener('pending',()=>handleNativePending());

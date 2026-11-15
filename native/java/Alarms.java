@@ -30,16 +30,43 @@ final class Alarms {
         return PendingIntent.getBroadcast(c, Math.abs(id.hashCode()), i, PendingIntent.FLAG_IMMUTABLE | flags);
     }
 
-    static void schedule(Context c, JSONObject alarm) {
+    static boolean schedule(Context c, JSONObject alarm) {
         String id = alarm.optString("id", "");
         long at = alarm.optLong("at", 0);
-        if (id.isEmpty() || at <= System.currentTimeMillis()) return;
+        if (id.isEmpty() || at <= System.currentTimeMillis()) return false;
         AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
         PendingIntent show = Notifs.openApp(c, null, null, 9);
         try {
             am.setAlarmClock(new AlarmManager.AlarmClockInfo(at, show), pending(c, id, alarm, PendingIntent.FLAG_UPDATE_CURRENT));
-        } catch (SecurityException ignored) {
+            Prefs.log(c, "scheduled " + id + " for " + new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date(at)));
+            return true;
+        } catch (SecurityException e) {
+            Prefs.log(c, "schedule refused: " + e);
+            return false;
         }
+    }
+
+    /** Number of reminders still in the future, and the time of the next one (0 = none). */
+    static int count(Context c) {
+        JSONArray arr = Prefs.alarms(c);
+        int n = 0;
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o != null && o.optLong("at", 0) > System.currentTimeMillis()) n++;
+        }
+        return n;
+    }
+
+    static long nextAt(Context c) {
+        JSONArray arr = Prefs.alarms(c);
+        long best = 0;
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) continue;
+            long at = o.optLong("at", 0);
+            if (at > System.currentTimeMillis() && (best == 0 || at < best)) best = at;
+        }
+        return best;
     }
 
     static void cancel(Context c, String id) {
@@ -67,8 +94,7 @@ final class Alarms {
         for (int i = 0; i < fresh.length(); i++) {
             JSONObject o = fresh.optJSONObject(i);
             if (o == null || o.optLong("at", 0) <= now) continue;
-            schedule(c, o);
-            keep.put(o);
+            if (schedule(c, o)) keep.put(o);
         }
         Prefs.putAlarms(c, keep);
     }

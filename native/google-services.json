@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "562589662039",
+    "project_id": "owlf-timelog",
+    "storage_bucket": "owlf-timelog.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:562589662039:android:e8ace5c5d9c34242339c12",
+        "android_client_info": {
+          "package_name": "com.ckj5.owlf"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "562589662039-aviup25570jm59oqpk43uiv2f9mn9t3b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBnKQ4Qg02p162H2zgulKR3INrvCp9hixI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "562589662039-aviup25570jm59oqpk43uiv2f9mn9t3b.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

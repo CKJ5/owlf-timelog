@@ -12,6 +12,31 @@
 <meta name="theme-color" content="#0d0d0d" id="theme-color-meta">
 <meta name="description" content="OWLF Time Log — personal productivity tracker">
 <title>OWLF Time Log</title>
+<script>
+// Android app only: show script errors on screen so a dead button can be diagnosed (tap the red box to dismiss).
+(function(){
+  if(!window.Capacitor)return;
+  var shown=0;
+  function show(msg){
+    try{
+      if(shown++>=3)return;
+      var b=document.createElement('div');
+      b.style.cssText='position:fixed;left:0;right:0;bottom:60px;z-index:2147483647;background:#b00020;color:#fff;font:11px/1.4 monospace;padding:8px 10px;max-height:35vh;overflow:auto;white-space:pre-wrap;word-break:break-all';
+      b.textContent='⚠ '+msg+'\n(tap to dismiss)';
+      b.onclick=function(){b.remove();};
+      (document.body||document.documentElement).appendChild(b);
+    }catch(e){}
+  }
+  window.addEventListener('error',function(e){
+    var t=e.target;
+    if(t&&t!==window&&t.tagName){if(t.tagName==='SCRIPT'&&t.src)show('script failed to load: '+t.src);return;}
+    show((e.message||'error')+' @ line '+e.lineno+':'+e.colno);
+  },true);
+  window.addEventListener('unhandledrejection',function(e){
+    var r=e.reason;show('promise: '+((r&&(r.stack||r.message))||r));
+  });
+})();
+</script>
 <link rel="icon" type="image/png" href="./favicon.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 

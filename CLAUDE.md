@@ -6,3 +6,5 @@
 - When you change behaviour, bump `version` in package.json.
 - Planner data (S.plan blocks / S.projects) syncs through Firestore with per-item `updated` merge: call `touchP(item)` after changing any block/project.
 - Paused work sessions live in `S.active['wp_<planId>']`; running ones in `S.active['w_<type>']`.
+- Exercise goal (from `S.exRuleFrom`): training day = finish the planned routine (formal workout), rest day = 100 core snack reps (`exTarget`). Use `exDayHit(dateKey)`; never compare `exTotal` to a target. Older days keep the old rule.
+- Recorded times can be edited later via `showTimeEditor(dateKey)` (daily report → "Edit recorded times"); work sessions store `start`/`ts` (ISO). The Stop dialog's 🔧 uses `window._stopOv` to override start/end.

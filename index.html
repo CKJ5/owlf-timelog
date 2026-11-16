@@ -144,7 +144,7 @@ async function syncToFirestore(){
     const yesterday=yd();
     const dayData=S.daily[today]||{};
     
-    const meta={workStreak:S.work.streak||0,sleepStreak:S.life.sleepStreak||0,exStreak:S.exercise.streak||0,workMin:S.workMin||180,sleepTarget:S.sleepTarget||7,exTarget:S.exTarget||100,medalTarget:S.medalTarget||25,projectTypes:S.projectTypes||[],uiStyle:S.uiStyle||'owlf',weekStart:S.weekStart||0,ratioSelections:S.ratioSelections||{},recentSessions:S.recentSessions||[],aiTasks:S.aiTasks||[],urgentAfter:S.urgentAfter||'10:00'};
+    const meta={workStreak:S.work.streak||0,sleepStreak:S.life.sleepStreak||0,exStreak:S.exercise.streak||0,workMin:S.workMin||180,sleepTarget:S.sleepTarget||7,exTarget:S.exTarget||100,medalTarget:S.medalTarget||25,projectTypes:S.projectTypes||[],uiStyle:S.uiStyle||'owlf',weekStart:S.weekStart||0,ratioSelections:S.ratioSelections||{},recentSessions:S.recentSessions||[],aiTasks:S.aiTasks||[],urgentAfter:S.urgentAfter||'10:00',exRuleFrom:S.exRuleFrom||null};
     const batch=db.batch();
     batch.set(db.doc(`users/${_uid}/days/${today}`),{...dayData,_ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
     // Also sync yesterday in case heavy/sleep sessions crossed midnight
@@ -405,6 +405,7 @@ async function restoreFromFirestore(){
       if(m.recentSessions)S.recentSessions=m.recentSessions;
       if(m.aiTasks)S.aiTasks=m.aiTasks;
       if(m.urgentAfter)S.urgentAfter=m.urgentAfter;
+      if(m.exRuleFrom&&(!S.exRuleFrom||m.exRuleFrom<S.exRuleFrom))S.exRuleFrom=m.exRuleFrom;
     }
     // Restore all days
     const days=await db.collection(`users/${_uid}/days`).get();
@@ -727,7 +728,7 @@ body.light .sbox{background:var(--bg3)}
 .ratio-seg{display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:rgba(255,255,255,.85);transition:width .5s;min-width:0;overflow:hidden}
 
 /* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:flex;align-items:center;justify-content:center}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:400;display:flex;align-items:center;justify-content:center}
 .modal-overlay.hidden{display:none}
 .modal{background:var(--bg2);border-radius:20px;padding:22px 18px 32px;width:calc(100% - 28px);max-width:520px;max-height:88vh;overflow-y:auto}
 .modal h3{font-size:18px;font-weight:700;margin-bottom:12px}
@@ -1139,12 +1140,12 @@ function installPWA(){
           <div style="font-size:11px;color:var(--muted);margin-top:4px">Sleep reminder = wake + (24h − target)</div>
         </div>
         <div style="margin-bottom:12px">
-          <div class="mlbl" style="margin-bottom:6px">Exercise Target (times/day)</div>
+          <div class="mlbl" style="margin-bottom:6px">Rest-day core target (reps)</div>
           <div style="display:flex;gap:8px;align-items:baseline">
             <input type="number" id="ex-target-settings-inp" value="100" min="1" max="500" step="10" style="flex:1;background:var(--bg3);border:1px solid var(--ex);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:15px">
             <button onclick="saveExTargetFromSettings()" style="padding:10px 16px;border-radius:8px;border:none;background:var(--ex);color:#001a19;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Save</button>
           </div>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px">Sets target for this month onwards</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Training day = finish the planned session. Rest day = this many core reps keeps the streak. Applies from this month onwards.</div>
         </div>
         <div style="margin-bottom:12px">
           <div class="mlbl" style="margin-bottom:6px">Weight unit</div>
@@ -1690,10 +1691,10 @@ function installPWA(){
   </div>
 
   <div class="card">
-    <div class="card-hdr"><span class="card-lbl">Daily Target</span><button class="set-tgt-btn" onclick="showExTarget()">Set</button></div>
+    <div class="card-hdr"><span class="card-lbl">Today's Goal</span><button class="set-tgt-btn" onclick="showExTarget()">Rest-day core</button></div>
     <div class="sr2" style="margin-bottom:8px">
-      <div class="sbox"><div style="font-size:38px;font-weight:700;font-family:'Space Mono',monospace;color:var(--ex);line-height:1" id="ex-times-today">0</div><div class="slbl">Times Today</div></div>
-      <div class="sbox"><div style="font-size:38px;font-weight:700;font-family:'Space Mono',monospace;color:var(--muted);line-height:1" id="ex-target-num">100</div><div class="slbl">Target</div></div>
+      <div class="sbox"><div style="font-size:38px;font-weight:700;font-family:'Space Mono',monospace;color:var(--ex);line-height:1" id="ex-times-today">0</div><div class="slbl" id="ex-lbl1">Core reps</div></div>
+      <div class="sbox"><div style="font-size:38px;font-weight:700;font-family:'Space Mono',monospace;color:var(--muted);line-height:1" id="ex-target-num">100</div><div class="slbl" id="ex-lbl2">Rest-day target</div></div>
     </div>
     <div class="pbar-wrap"><div class="pbar" id="ex-pbar" style="width:0%;background:var(--ex)"></div></div>
     <div style="display:flex;justify-content:space-between;margin-top:5px">
@@ -2466,7 +2467,7 @@ function toggleWork(type){
   const a=S.active['w_'+type];
   if(a){
     const el=Math.round(elMin(a.start));
-    showModal(`<h3 style="color:var(--work)">Stop ${entCap(type)}</h3><p style="color:var(--muted);font-size:13px;margin-bottom:10px">Session: ${fmt(el)}</p><label class="mlbl">Wasted (min)</label><input type="number" id="w-wst" placeholder="0" min="0" style="border-color:var(--work)"><div class="mbtns"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" onclick="stopWork('${type}',${a.start})">Done</button></div>`,null);
+    showModal(`<h3 style="color:var(--work)">Stop ${entCap(type)}</h3><p style="color:var(--muted);font-size:13px;margin-bottom:10px">Session: ${fmt(el)}</p><label class="mlbl">Wasted (min)</label><input type="number" id="w-wst" placeholder="0" min="0" style="border-color:var(--work)"><div class="mbtns"><button class="bcanc" title="Adjust times" style="flex:0 0 auto;padding:13px 12px;font-size:15px" onclick="showStopAdjust('${type}')">🔧</button><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" onclick="stopWork('${type}',${a.start})">Done</button></div>`,null);
   } else {
     const other=WTYPES.find(t2=>t2!==type&&S.active['w_'+t2]);
     if(other){alert('Stop '+other+' first!');return;}
@@ -2530,21 +2531,26 @@ function stopWork(type,startTs){
   if(!S.active['w_'+type]){closeModal();return;}
   console.log('stopping, active before:', JSON.stringify(S.active)); // ← ADD
   const _a0=S.active['w_'+type];const actualStart=_a0.origStart||_a0.start||startTs;const _pausedMin=(_a0.pausedMs||0)/60000;
-  const el=elMin(actualStart),wst=parseFloat(document.getElementById('w-wst')?.value)||0,net=Math.max(0,el-wst);
-  const d=getToday();d[type]=(d[type]||0)+net;if(!d.wasted)d.wasted={design:0,games:0,clients:0};d.wasted[type]=(d.wasted[type]||0)+wst;
+  const _ov=(window._stopOv&&window._stopOv.type===type)?window._stopOv:null;window._stopOv=null;
+  const endMs=_ov?_ov.endMs:nowTs();
+  const startMs=_ov?_ov.startMs:actualStart;
+  const el=_ov?Math.max(0,Math.round((endMs-startMs)/60000-_pausedMin)):elMin(_a0.start),wst=parseFloat(document.getElementById('w-wst')?.value)||0,net=Math.max(0,el-wst);
+  const dKey=_ov?dayKeyOf(endMs):tk();
+  const d=ensureDay(dKey);d[type]=(d[type]||0)+net;if(!d.wasted)d.wasted={design:0,games:0,clients:0};d.wasted[type]=(d.wasted[type]||0)+wst;
   const proj=S.active['w_'+type]?.proj||'';
   if(!S.sessions)S.sessions={};
-  if(!S.sessions[tk()])S.sessions[tk()]=[];
+  if(!S.sessions[dKey])S.sessions[dKey]=[];
   const ptype=S.active['w_'+type]?.ptype||'';
   const _pid=S.active['w_'+type]?.planId||null;
-  S.sessions[tk()].push({type,proj,ptype,dur:net,wasted:wst,ts:new Date().toISOString(),...(_pid?{planId:_pid}:{})});
-  if(_pid)finishPlanBlock(_pid,actualStart,wst,_pausedMin);
+  S.sessions[dKey].push({type,proj,ptype,dur:net,wasted:wst,ts:new Date(endMs).toISOString(),start:new Date(startMs).toISOString(),...(_pid?{planId:_pid}:{})});
+  if(_pid)finishPlanBlock(_pid,startMs,wst,_pausedMin,endMs);
   delete S.active['w_'+type];
   console.log('stopping, active after delete:', JSON.stringify(S.active)); // ← ADD
   if(window._swReg?.active)window._swReg.active.postMessage({type:'CLEAR',tag:'owlf-work'});
   save();closeModal();calcWorkStreak();updateWorkUI();
   syncActiveToFirestore();
   console.log('syncActiveToFirestore called'); // ← ADD
+  if(dKey!==tk())teSyncDay(dKey);
   if(_pid)setTimeout(offerResume,80);
 }
   
@@ -2804,9 +2810,9 @@ function startPlanBlock(id){
   b.aStart=tsToHM(nowTs());b.aEnd=null;b.aMin=null;b.wasted=0;b.paused=0;touchP(b);
   save();updateWorkUI();syncActiveToFirestore();plannerChanged();
 }
-function finishPlanBlock(id,startTs,wst,pausedMin){
+function finishPlanBlock(id,startTs,wst,pausedMin,endMs){
   const b=liveItems(S.plan).find(x=>x.id===id);if(!b)return;
-  b.aStart=tsToHM(startTs);b.aEnd=tsToHM(nowTs());b.wasted=wst||0;b.paused=Math.round(pausedMin||0);b.aMin=actMinOf(b);
+  b.aStart=tsToHM(startTs);b.aEnd=tsToHM(endMs||nowTs());b.wasted=wst||0;b.paused=Math.round(pausedMin||0);b.aMin=actMinOf(b);
   touchP(b);plannerChanged();
   if(S.gcalAuto)gcalPushBlock(b).catch(e=>console.warn('gcal',e));
 }
@@ -3877,7 +3883,7 @@ function commitWorkoutDay(date){
     delta+=newTotal-oldTotal;
   });
   d.exTotal=Math.max(0,(d.exTotal||0)+delta);
-  d.exHit=(d.exTotal||0)>=(S.exTarget||10);
+  d.exHit=exDayHit(date);d.exCore=exCoreReps(date);
   calcExStreak();
 }
 function wkSave(w,commit){
@@ -4323,8 +4329,11 @@ function snackAdd(exId){
   const s=newSet();s.done=true;s.ts=now;
   if(x.kind==='time')s.t=x.snackN;else s.r=x.snackN;
   en.sets.push(s);w.end=Math.max(w.end||0,now);
-  wkSave(w);                     // no commitWorkoutDay: snacks never feed the formal daily totals / streak
+  const _hitBefore=exDayHit(tk());
+  wkSave(w);                     // snacks don't feed formal daily totals; rest-day core reps do count for the streak goal
+  exSnackChanged(tk());
   toast('⚡','+'+x.snackN+(x.kind==='time'?' s ':' ')+x.name,'Logged at '+new Date(now).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+  if(!_hitBefore&&exDayHit(tk())&&!exPlannedRoutine(tk()))setTimeout(()=>toast('🔥','Rest-day core goal hit','Streak kept — '+coreTargetFor(tk())+' core reps'),400);
   renderWkHome();
 }
 function snackUndo(){
@@ -4334,7 +4343,7 @@ function snackUndo(){
   last.en.sets=last.en.sets.filter(s=>s!==last.s);
   last.w.exercises=last.w.exercises.filter(en=>en.sets.length);
   if(!last.w.exercises.length)last.w.deleted=true;
-  wkSave(last.w);renderWkHome();
+  wkSave(last.w);exSnackChanged(last.w.date);renderWkHome();
 }
 const snackExercises=()=>(S.exLib||[]).filter(x=>!x.archived&&x.snackN>0);
 function snackUnit(x){return x.kind==='time'?' s':(x.id==='p_deadbug'?' /side':'');}
@@ -4362,14 +4371,14 @@ function weekStrip(){
     const k=addDaysKey(wk,i),dow=dowOfKey(k),r=rs.find(x=>x.day===dow),isDone=formalDone(k),isToday=k===today;
     let sym,col;
     if(r){planned++;if(isDone){done++;sym='✓';col='#3fa66b';}else if(k<today){sym='✗';col='var(--muted)';}else{sym='○';col='var(--ex)';}}
-    else{sym=isDone?'✓':'·';col=isDone?'#3fa66b':'var(--muted)';}
-    return `<div style="flex:1;text-align:center;padding:5px 0;border-radius:8px;${isToday?'border:1px solid var(--ex);':'border:1px solid transparent;'}"><div style="font-size:9px;color:var(--muted);font-weight:700">${DOW_SHORT[dow].toUpperCase()}</div><div style="font-size:15px;font-weight:700;color:${col};line-height:1.3">${sym}</div><div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r?escapeHtml(r.name.replace(/^Light /,'')):'rest'}</div></div>`;
+    else{const rh=k>=exRuleFrom()?exDayHit(k):isDone;sym=rh?'✓':(k<today?'✗':'○');col=rh?'#3fa66b':(k<today?'var(--muted)':'var(--ex)');}
+    return `<div style="flex:1;text-align:center;padding:5px 0;border-radius:8px;${isToday?'border:1px solid var(--ex);':'border:1px solid transparent;'}"><div style="font-size:9px;color:var(--muted);font-weight:700">${DOW_SHORT[dow].toUpperCase()}</div><div style="font-size:15px;font-weight:700;color:${col};line-height:1.3">${sym}</div><div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r?escapeHtml(r.name.replace(/^Light /,'')):'rest·core'}</div></div>`;
   }).join('');
   return `<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--muted)">THIS WEEK</span><span style="font-size:11px;color:var(--muted)">${planned?`<b style="color:var(--text)">${done}/${planned}</b> planned sessions done${planned?` · ${Math.round(done/planned*100)}%`:''}`:'No plan set'}</span></div><div style="display:flex;gap:3px;margin-top:4px">${cells}</div></div>`;
 }
 function todayCard(){
   const r=todayRoutine(),today=tk(),dn=DOW_LONG[todayDow()];
-  if(!r)return `<div style="margin-top:8px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--bg3)"><div style="font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted)">${dn.toUpperCase()}</div><div style="font-size:15px;font-weight:700;margin-top:2px">😴 Rest day</div><div style="font-size:11px;color:var(--muted);margin-top:2px">Recovery is part of the plan — light activity is fine.</div></div>`;
+  if(!r)return `<div style="margin-top:8px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--bg3)"><div style="font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted)">${dn.toUpperCase()}</div><div style="font-size:15px;font-weight:700;margin-top:2px">😴 Rest day</div><div style="font-size:11px;color:var(--muted);margin-top:2px">Goal: <b style="color:var(--ex)">${Math.min(exCoreReps(today),coreTargetFor(today))}/${coreTargetFor(today)}</b> core reps to keep your streak ${exDayHit(today)?'✓':''}</div></div>`;
   const did=liveW().some(w=>!w.snack&&w.end&&w.date===today&&w.routineId===r.id&&(w.exercises||[]).some(en=>en.sets.some(s=>s.done)));
   return `<div style="margin-top:8px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--ex);background:color-mix(in srgb,var(--ex) 8%,transparent)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="min-width:0"><div style="font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--ex)">${dn.toUpperCase()} · TODAY${did?' · ✓ DONE':''}</div><div style="font-size:18px;font-weight:700;margin-top:2px">${escapeHtml(r.name)}</div><div style="font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5">${r.items.map(itemText).join(' · ')}</div></div><button class="plan-btn pri" style="flex:none;padding:11px 16px;background:var(--ex);border-color:var(--ex);color:#001a19;font-weight:700" onclick="startRoutine('${r.id}')">${did?'↻ Again':'▶ Start'}</button></div></div>`;
 }
@@ -4429,16 +4438,37 @@ function resetEx(){
   updateExUI();
 }
 
-function showExTarget(){showModal(`<h3 style="color:var(--ex)">Daily Target</h3><label class="mlbl">Times per day</label><input type="number" id="ext-inp" value="${S.exTarget||10}" min="1" style="border-color:var(--ex)"><div class="mbtns" style="margin-top:6px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf bex" onclick="saveExTarget()">Save</button></div>`,null);}
+function showExTarget(){showModal(`<h3 style="color:var(--ex)">Rest-day core target</h3><div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5">Training day: finish the planned session. Rest day: do this many core reps to keep the streak.</div><label class="mlbl">Core reps on a rest day</label><input type="number" id="ext-inp" value="${S.exTarget||10}" min="1" style="border-color:var(--ex)"><div class="mbtns" style="margin-top:6px"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf bex" onclick="saveExTarget()">Save</button></div>`,null);}
 function saveExTarget(){const v=parseInt(document.getElementById('ext-inp')?.value)||10;S.exTarget=v;save();closeModal();checkExTarget();updateExUI();}
 
 function checkExTarget(){
   const d=getToday();
-  if((d.exTotal||0)>=S.exTarget&&!d.exHit){d.exHit=true;save();}
+  refreshExHit(tk());save();
   calcExStreak();
 }
+// ═══ EXERCISE DAILY GOAL ═══
+// Training day (a routine is planned for that weekday): finish that day's session.
+// Rest day: 100 core snack reps (target adjustable) keeps the streak. Days before S.exRuleFrom keep the old "total reps" rule.
+function exRuleFrom(){if(!S.exRuleFrom){S.exRuleFrom=tk();save();}return S.exRuleFrom;}
+const coreTargetFor=k=>getMonthTarget('exTarget',k.slice(0,7))||100;
+const exPlannedRoutine=k=>sortedRoutines().find(r=>r.day===dowOfKey(k))||null;
+const exCoreReps=k=>snackStats(k,k).reps;
+function exDayHit(k){
+  const d=S.daily[k];
+  if(k<exRuleFrom())return !!d&&(d.exTotal||0)>=coreTargetFor(k);
+  if(formalDone(k))return true;
+  return !exPlannedRoutine(k)&&exCoreReps(k)>=coreTargetFor(k);
+}
+function refreshExHit(k){const d=ensureDay(k);d.exHit=exDayHit(k);d.exCore=exCoreReps(k);}
+function exGoalInfo(k){
+  const r=exPlannedRoutine(k),hit=exDayHit(k);
+  if(r)return{planned:true,hit,big1:hit?'✓':'—',lbl1:'Session',big2:r.name.replace(/^Light /,''),lbl2:'Planned today',pct:hit?100:0,txt:hit?'Planned session done':'Finish: '+r.name};
+  const cur=exCoreReps(k),tgt=coreTargetFor(k);
+  return{planned:false,hit,big1:cur,lbl1:'Core reps',big2:tgt,lbl2:'Rest-day target',pct:Math.min(100,cur/tgt*100),txt:cur+' / '+tgt+' core reps'};
+}
+function exSnackChanged(date){refreshExHit(date);calcExStreak();updateExUI();}
 function calcExStreak(){
-  S.exercise.streak=calcSignedStreak(dd=>dd&&!!dd.exHit);
+  S.exercise.streak=calcSignedStreak((dd,k)=>(k&&k>=exRuleFrom())?exDayHit(k):!!(dd&&dd.exHit));
   save();
 }
 
@@ -4942,12 +4972,14 @@ function updateLifeUI(){
 function updateExUI(){
   if(typeof seedExLib==='function')seedExLib();
   calcExStreak();
-  const d=getToday();const total=d.exTotal||0;const tgt=S.exTarget||10;
-  document.getElementById('ex-times-today').textContent=total;
-  document.getElementById('ex-target-num').textContent=tgt;
-  document.getElementById('ex-pbar').style.width=Math.min(100,(total/tgt)*100)+'%';
-  document.getElementById('ex-prog-txt').textContent=total+' / '+tgt;
-  document.getElementById('ex-hit-lbl').textContent=d.exHit?'✓ Hit!':'';
+  const d=getToday();refreshExHit(tk());
+  {const g=exGoalInfo(tk());
+   document.getElementById('ex-times-today').textContent=g.big1;
+   const t2=document.getElementById('ex-target-num');t2.textContent=g.big2;t2.style.fontSize=g.planned?'20px':'38px';
+   document.getElementById('ex-lbl1').textContent=g.lbl1;document.getElementById('ex-lbl2').textContent=g.lbl2;
+   document.getElementById('ex-pbar').style.width=g.pct+'%';
+   document.getElementById('ex-prog-txt').textContent=g.txt;
+   document.getElementById('ex-hit-lbl').textContent=g.hit?'✓ Hit!':'';}
   animateStreakNumber(document.getElementById('ex-streak-inline'),(S.exercise&&S.exercise.streak)||0);
 
   // Strength toggle buttons
@@ -5096,6 +5128,190 @@ setTimeout(()=>checkForUpdate(false),4000);
 setInterval(()=>checkForUpdate(false),30*60*1000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(()=>checkForUpdate(false),800);});
 window.addEventListener('online',()=>checkForUpdate(false));
+
+// ═══ TIME EDITOR — fix forgotten start/stop afterwards ═══
+const dayKeyOf=ms=>new Date(ms+getTZOffset()*3600000).toISOString().slice(0,10);
+function msFromHM(dateKey,hm){const[y,m,d]=dateKey.split('-').map(Number);return Date.UTC(y,m-1,d)+hm2min(hm)*60000-getTZOffset()*3600000;}
+const TE_ENT_CAP={play:'Game',show:'Show',outdoor:'Outdoor',clean:'Clean',laydown:'Laydown',date:'Date'};
+const TE_ENT_ICO={play:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'};
+const TE_W_ICO={design:'✏️',games:'🕹',clients:'👔'};
+let _te=null;
+const _gv=id=>(document.getElementById(id)?.value||'');
+function teEntries(dateKey){
+  const d=S.daily[dateKey]||{},out=[];
+  ((S.sessions&&S.sessions[dateKey])||[]).forEach((s,i)=>{
+    const endMs=s.ts?new Date(s.ts).getTime():null,w=s.wasted||0;
+    const startMs=s.start?new Date(s.start).getTime():(endMs!=null?endMs-((s.dur||0)+w)*60000:null);
+    out.push({src:'work',i,cat:s.type,icon:TE_W_ICO[s.type]||'⏱',label:(s.proj||s.type)+(s.ptype?' · '+s.ptype:''),name:s.proj||'',startMs,endMs,dur:s.dur||0,wasted:w});
+  });
+  const simple=(src,cat,log,icon,label,names)=>(log||[]).forEach((e,i)=>{
+    const o=(e&&typeof e==='object')?e:null,dur=o?(o.dur||0):(e||0),endMs=o&&o.end?o.end:null;
+    out.push({src,i,cat,icon,label:(names&&names[i])||label,name:(names&&names[i])||'',startMs:endMs!=null?endMs-dur*60000:null,endMs,dur,wasted:0});
+  });
+  simple('snake','',d.snakeLog,'🐍','Heavy');
+  simple('fire','',d.fireLog,'🧘','Meditate');
+  ENT_TYPES.forEach(t=>simple('ent',t,d['ent'+TE_ENT_CAP[t]+'Log'],TE_ENT_ICO[t],t[0].toUpperCase()+t.slice(1),d['ent'+TE_ENT_CAP[t]+'Names']));
+  return out;
+}
+function teAdj(d,src,cat,dDur,dWst,dCnt){
+  const add=(k,v)=>{d[k]=Math.max(0,Math.round(((d[k]||0)+v)*10)/10);};
+  if(src==='work'){add(cat,dDur);if(!d.wasted)d.wasted={design:0,games:0,clients:0};d.wasted[cat]=Math.max(0,(d.wasted[cat]||0)+dWst);}
+  else if(src==='snake'){add('snakeDur',dDur);add('snakeSessions',dCnt);}
+  else if(src==='fire'){add('fireDur',dDur);add('fireCount',dCnt);d.hadFire=(d.fireCount||0)>0;}
+  else if(src==='ent'){const c=TE_ENT_CAP[cat];add('ent'+c,dDur);add('ent'+c+'Sessions',dCnt);}
+}
+const _teKey=(src,cat)=>src==='snake'?'snakeLog':src==='fire'?'fireLog':'ent'+TE_ENT_CAP[cat]+'Log';
+function showTimeEditor(dateKey){
+  const rows=teEntries(dateKey).sort((a,b)=>(a.startMs==null?1e15:a.startMs)-(b.startMs==null?1e15:b.startMs));
+  const d=S.daily[dateKey]||{};
+  const hm=ms=>ms==null?'??:??':tsToHM(ms);
+  const btn='class="plan-mini" style="width:auto;padding:0 11px;height:34px;font-size:15px"';
+  const list=rows.map(r=>`<div style="display:flex;align-items:center;gap:6px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.icon} ${escapeHtml(r.label)}</div><div style="font-size:12px;color:var(--muted);font-family:'Space Mono',monospace">${hm(r.startMs)}–${hm(r.endMs)} · ${fmt(Math.round(r.dur))}${r.wasted?' (−'+r.wasted+'m)':''}</div></div><button ${btn} onclick="teEdit('${dateKey}','${r.src}',${r.i},'${r.cat||''}')">✎</button><button ${btn} onclick="teDelete('${dateKey}','${r.src}',${r.i},'${r.cat||''}')">🗑</button></div>`).join('')||'<div style="font-size:13px;color:var(--muted);padding:10px 0">No timed entries on this day.</div>';
+  showModal(`<h3 style="color:var(--work);margin-bottom:4px">✎ Edit times</h3><div style="font-size:12px;color:var(--muted);margin-bottom:6px">${fmtDate(dateKey)} · work, Heavy, meditation, entertainment, sleep</div>
+  <div style="max-height:52vh;overflow-y:auto;overflow-x:hidden">${list}
+  <div class="mlbl" style="margin-top:14px">🌙 Sleep</div>
+  <div style="display:flex;gap:8px"><div style="flex:1"><label class="mlbl" style="font-size:10px">Bedtime (this night)</label><input type="time" id="te-sleep" value="${d.sleepTime||''}"></div><div style="flex:1"><label class="mlbl" style="font-size:10px">Wake (this morning)</label><input type="time" id="te-wake" value="${d.wakeTime||''}"></div></div>
+  <button class="plan-btn" style="width:100%;margin-top:2px" onclick="teSaveSleep('${dateKey}')">Save sleep times</button></div>
+  <div class="mbtns" style="margin-top:12px"><button class="bcanc" onclick="teAddForm('${dateKey}')">＋ Add missed</button><button class="bconf" onclick="teDone('${dateKey}')">Done</button></div>`,null);
+}
+function teForm(dateKey,r){
+  const add=_te.mode==='add';
+  const noT=!add&&r.startMs==null;
+  const sv=add?'':(r.startMs!=null?tsToHM(r.startMs):''),ev=add?'':(r.endMs!=null?tsToHM(r.endMs):'');
+  const catSel=add?`<label class="mlbl">What</label><select id="te-cat">${['work:design|✏️ Design','work:games|🕹 Games','work:clients|👔 Clients','snake|🐍 Heavy','fire|🧘 Meditate',...ENT_TYPES.map(t=>'ent:'+t+'|'+TE_ENT_ICO[t]+' '+t[0].toUpperCase()+t.slice(1))].map(o=>{const[v,l]=o.split('|');return `<option value="${v}">${l}</option>`;}).join('')}</select>`
+    :(r.src==='work'?`<label class="mlbl">Type</label><select id="te-type">${['design','games','clients'].map(t=>`<option value="${t}" ${t===r.cat?'selected':''}>${t}</option>`).join('')}</select>`:'');
+  const showName=add||r.src==='work'||r.src==='ent';
+  showModal(`<h3 style="color:var(--work)">${add?'＋ Add missed entry':'✎ '+escapeHtml(r.label)}</h3>
+  ${noT?'<div style="font-size:12px;color:#e0a030;margin-bottom:8px">This older entry has no clock times — set them.</div>':''}
+  ${catSel}
+  ${showName?`<label class="mlbl">${add?'Project / name (optional)':'Project / name'}</label><input type="text" id="te-proj" value="${escapeHtml(add?'':(r.name||''))}">`:''}
+  <div style="display:flex;gap:8px"><div style="flex:1"><label class="mlbl">Start</label><input type="time" id="te-start" value="${sv}"></div><div style="flex:1"><label class="mlbl">End</label><input type="time" id="te-end" value="${ev}"></div></div>
+  ${(add||r.src==='work')?`<label class="mlbl">Wasted (min)</label><input type="number" id="te-wst" min="0" value="${add?'':(r.wasted||'')}" placeholder="0">`:''}
+  <div style="font-size:11px;color:var(--muted);margin-top:6px">${fmtDate(dateKey)} · if End is earlier than Start it counts as next day.</div>
+  <div class="mbtns" style="margin-top:12px"><button class="bcanc" onclick="showTimeEditor('${dateKey}')">Back</button><button class="bconf" onclick="teSave()">Save</button></div>`,null);
+}
+function teEdit(dateKey,src,i,cat){
+  const r=teEntries(dateKey).find(x=>x.src===src&&x.i===i&&(x.cat||'')===cat);if(!r)return;
+  _te={mode:'edit',dateKey,src,i,cat};teForm(dateKey,r);
+}
+function teAddForm(dateKey){_te={mode:'add',dateKey};teForm(dateKey,{});}
+function tePlanSync(planId,sMs,eMs,wst){
+  const b=liveItems(S.plan).find(x=>x.id===planId);if(!b)return;
+  b.aStart=tsToHM(sMs);b.aEnd=tsToHM(eMs);b.wasted=wst;b.aMin=actMinOf(b);touchP(b);plannerChanged();
+}
+function teSave(){
+  const t=_te;if(!t)return;
+  const st=_gv('te-start'),en=_gv('te-end');
+  if(!st||!en){alert('Set both start and end time.');return;}
+  const dk=t.dateKey;
+  const sMs=msFromHM(dk,st);let eMs=msFromHM(dk,en);if(eMs<=sMs)eMs+=86400000;
+  if(eMs>Date.now()+60000){alert('End time is in the future.');return;}
+  const wst=Math.max(0,parseFloat(_gv('te-wst'))||0),gross=(eMs-sMs)/60000;
+  if(wst>=gross){alert('Wasted time must be shorter than the session.');return;}
+  const dur=Math.round(gross-wst),name=_gv('te-proj').trim();
+  const d=ensureDay(dk);let src=t.src,cat=t.cat;
+  if(t.mode==='add'){const v=_gv('te-cat').split(':');src=v[0];cat=v[1]||'';}
+  if(src==='work'){
+    if(!S.sessions)S.sessions={};if(!S.sessions[dk])S.sessions[dk]=[];
+    if(t.mode==='add'){
+      S.sessions[dk].push({type:cat,proj:name,ptype:'',dur,wasted:wst,ts:new Date(eMs).toISOString(),start:new Date(sMs).toISOString(),manual:true});
+      teAdj(d,'work',cat,dur,wst,1);
+    }else{
+      const s=S.sessions[dk][t.i];if(!s)return;
+      const nc=_gv('te-type')||s.type;
+      teAdj(d,'work',s.type,-(s.dur||0),-(s.wasted||0),0);
+      s.type=nc;s.proj=name;s.dur=dur;s.wasted=wst;s.ts=new Date(eMs).toISOString();s.start=new Date(sMs).toISOString();
+      teAdj(d,'work',nc,dur,wst,0);
+      if(s.planId)tePlanSync(s.planId,sMs,eMs,wst);
+    }
+  }else{
+    const key=_teKey(src,cat);if(!d[key])d[key]=[];
+    if(t.mode==='add'){
+      d[key].push({dur,end:eMs,start:sMs,manual:true});teAdj(d,src,cat,dur,0,1);
+      if(src==='ent'&&name){const nk='ent'+TE_ENT_CAP[cat]+'Names';d[nk]=[...(d[nk]||[]),name];}
+    }else{
+      const old=d[key][t.i];if(old===undefined)return;
+      const od=(old&&typeof old==='object')?(old.dur||0):(old||0);
+      d[key][t.i]=Object.assign((old&&typeof old==='object')?old:{},{dur,end:eMs,start:sMs});
+      teAdj(d,src,cat,dur-od,0,0);
+    }
+  }
+  teAfter(dk);
+}
+function teDelete(dateKey,src,i,cat){
+  if(!confirm('Delete this entry? Its time is removed from the day totals.'))return;
+  const d=ensureDay(dateKey);
+  if(src==='work'){
+    const s=(S.sessions[dateKey]||[])[i];if(!s)return;
+    teAdj(d,'work',s.type,-(s.dur||0),-(s.wasted||0),0);
+    S.sessions[dateKey].splice(i,1);
+    if(s.planId){const b=liveItems(S.plan).find(x=>x.id===s.planId);if(b){b.aStart=null;b.aEnd=null;b.aMin=null;b.wasted=0;b.paused=0;touchP(b);plannerChanged();}}
+  }else{
+    const key=_teKey(src,cat),old=(d[key]||[])[i];if(old===undefined)return;
+    const od=(old&&typeof old==='object')?(old.dur||0):(old||0);
+    d[key].splice(i,1);teAdj(d,src,cat,-od,0,-1);
+    if(src==='ent'){const nk='ent'+TE_ENT_CAP[cat]+'Names';if(d[nk]&&d[nk][i]!==undefined)d[nk].splice(i,1);}
+  }
+  teAfter(dateKey);
+}
+function teRecalcSleep(k){
+  const d=S.daily[k];if(!d||!d.wakeTime)return;
+  const p=S.daily[addDaysKey(k,-1)];if(!p||!p.sleepTime)return;
+  const a=parseHM(p.sleepTime),b=parseHM(d.wakeTime);
+  let s=toMin(a.h,a.m),w=toMin(b.h,b.m);if(w<=s)w+=1440;
+  const hrs=(w-s)/60;if(hrs>0&&hrs<20)d.sleepHours=Math.round((hrs+(d.napDur||0)/60)*10)/10;
+}
+function teSaveSleep(dateKey){
+  const d=ensureDay(dateKey);
+  const sl=_gv('te-sleep'),wk=_gv('te-wake');
+  if(sl)d.sleepTime=sl;else delete d.sleepTime;
+  if(wk)d.wakeTime=wk;else delete d.wakeTime;
+  teRecalcSleep(dateKey);teRecalcSleep(addDaysKey(dateKey,1));
+  teAfter(dateKey,[addDaysKey(dateKey,-1),addDaysKey(dateKey,1)]);
+}
+async function teSyncDay(dk){
+  if(typeof _uid==='undefined'||!_uid)return;
+  try{
+    const b=db.batch();
+    b.set(db.doc(`users/${_uid}/days/${dk}`),{...(S.daily[dk]||{}),_ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    b.set(db.doc(`users/${_uid}/sessions/${dk}`),{list:(S.sessions&&S.sessions[dk])||[]});
+    await b.commit();
+  }catch(e){console.warn('Day sync failed',e);}
+}
+function teAfter(dk,alsoSync){
+  save();
+  try{calcWorkStreak();calcSleepStreak();}catch(e){}
+  try{updateWorkUI();updateLifeUI();}catch(e){}
+  teSyncDay(dk);(alsoSync||[]).forEach(k=>{if(S.daily[k])teSyncDay(k);});
+  showTimeEditor(dk);
+}
+function teDone(dk){
+  closeModal();
+  try{renderReport();}catch(e){}
+  try{const ov=document.getElementById('report-popup-overlay');if(ov&&!ov.classList.contains('hidden'))openReportPopup();}catch(e){}
+}
+function showStopAdjust(type){
+  const a=S.active['w_'+type];if(!a)return;
+  const prev=document.getElementById('w-wst')?.value||'';
+  const sMs=a.origStart||a.start;
+  showModal(`<h3 style="color:var(--work)">🔧 Adjust ${entCap(type)} session</h3>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Forgot to press Start or Stop? Enter the real times (${fmtDate(dayKeyOf(sMs))}).</p>
+  <div style="display:flex;gap:8px"><div style="flex:1"><label class="mlbl">Start</label><input type="time" id="sa-start" value="${tsToHM(sMs)}" style="border-color:var(--work)"></div><div style="flex:1"><label class="mlbl">End</label><input type="time" id="sa-end" value="${tsToHM(nowTs())}" style="border-color:var(--work)"></div></div>
+  <label class="mlbl">Wasted (min)</label><input type="number" id="w-wst" value="${prev}" min="0" placeholder="0" style="border-color:var(--work)">
+  <div class="mbtns"><button class="bcanc" onclick="toggleWork('${type}')">Back</button><button class="bconf" onclick="stopWorkAdjusted('${type}')">Done</button></div>`,null);
+}
+function stopWorkAdjusted(type){
+  const a=S.active['w_'+type];if(!a){closeModal();return;}
+  const s0=a.origStart||a.start,dk=dayKeyOf(s0);
+  const st=_gv('sa-start'),en=_gv('sa-end');
+  if(!st||!en){alert('Set both times.');return;}
+  const sMs=msFromHM(dk,st);let eMs=msFromHM(dk,en);if(eMs<=sMs)eMs+=86400000;
+  if(eMs>nowTs()+60000){alert('End time is in the future.');return;}
+  const wst=parseFloat(_gv('w-wst'))||0;
+  if(wst>=(eMs-sMs)/60000){alert('Wasted time must be shorter than the session.');return;}
+  window._stopOv={type,startMs:sMs,endMs:eMs};
+  stopWork(type,s0);
+}
 
 // ═══ LIVE TICK ═══
 let _entWarn10Sent=false; // reset each day
@@ -5419,7 +5635,7 @@ function buildDailyCal(){
     const exTgt=getMonthTarget('exTarget',moKey);
     const wHit=wt>=moTgt;
     const sHit=(d&&(d.sleepHours||0)>=slTgt);
-    const eHit=exT>=exTgt;
+    const eHit=exDayHit(k)&&hasData;
     const isPerf=wHit&&sHit&&eHit&&hasData;
     let cls='rcal-day';
     if(!hasData)cls+=' no-data';
@@ -5513,7 +5729,7 @@ function buildWeeklyCal(){
       const exTgt=getMonthTarget('exTarget',moKey);
       const wHit=d&&(d.design||0)+(d.games||0)+(d.clients||0)>=moTgt;
       const sHit=d&&(d.sleepHours||0)>=slTgt;
-      const eHit=d&&(d.exTotal||0)>=exTgt;
+      const eHit=!!d&&exDayHit(k);
       const isPerf=wHit&&sHit&&eHit&&hasData;
       const day=parseInt(k.split('-')[2]);
       let cls='rcal-day';
@@ -5912,11 +6128,14 @@ function buildDailyCompact(dateKey){
     
     buildPrepSection(d,dateKey),
     compactSecFiltered('💪 Exercise','var(--ex)',[
+      ['Goal',exDayHit(dateKey)?'✓ hit':'—',exDayHit(dateKey)?'#3fa66b':'var(--muted)'],
+      ['Core reps',exCoreReps(dateKey),'var(--ex)'],
       ['Total',d.exTotal||0,'var(--ex)'],
       ...EX_KEYS.map(t=>[EX_LABELS[t], String(d[t]||0)+((d[t+'Sets']&&d[t+'Sets'].length)?' ('+d[t+'Sets'].join('+')+')'  : '')])
     ]),
 
     buildTimeline(dateKey),
+    `<button style="width:100%;margin:10px 0;padding:11px;border-radius:10px;border:1.5px solid var(--work);background:transparent;color:var(--work);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer" onclick="showTimeEditor('${dateKey}')">✎ Edit recorded times</button>`,
     
     journal?`<div class="compact-section"><div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;border-bottom:1px solid var(--border);padding-bottom:5px">📓 Journal</div><textarea rows="4" style="width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:13px;resize:none;line-height:1.6" oninput="saveInlineJournal('${dateKey}',this.value)">${journal}</textarea></div>`
     :`<div class="compact-section"><div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;border-bottom:1px solid var(--border);padding-bottom:5px">📓 Journal</div><textarea rows="3" placeholder="Write your thoughts..." style="width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:13px;resize:none;line-height:1.6" oninput="saveInlineJournal('${dateKey}',this.value)"></textarea></div>`,
@@ -6732,8 +6951,8 @@ function getMedalData(period,sel){
     workTarget=wT;
     sleepDone=(d.sleepHours||0)*60;
     sleepTarget=slT*60;
-    exDone=d.exTotal||0;
-    exTarget=exTgt;
+    exDone=exDayHit(sel)?1:0;
+    exTarget=1;
   } else if(period==='monthly'){
     const wT=getMonthTarget('workMin',sel);
     const slT=getMonthTarget('sleepTarget',sel);
@@ -6742,12 +6961,12 @@ function getMedalData(period,sel){
     const daysInMo=new Date(parseInt(sel.slice(0,4)),parseInt(sel.slice(5,7)),0).getDate();
     workTarget=wT*daysInMo;
     sleepTarget=slT*daysInMo*60;
-    exTarget=exTgt*daysInMo;
+    exTarget=daysInMo;
     days.forEach(k=>{
       const d=S.daily[k];
       workDone+=(d.design||0)+(d.games||0)+(d.clients||0);
       sleepDone+=(d.sleepHours||0)*60;
-      exDone+=(d.exTotal||0);
+      exDone+=exDayHit(k)?1:0;
     });
   } else {
     // yearly — sum months
@@ -6761,12 +6980,12 @@ function getMedalData(period,sel){
       const daysInMo=new Date(parseInt(mo.slice(0,4)),parseInt(mo.slice(5,7)),0).getDate();
       workTarget+=wT*daysInMo;
       sleepTarget+=slT*daysInMo*60;
-      exTarget+=exTgt*daysInMo;
+      exTarget+=daysInMo;
       days.forEach(k=>{
         const d=S.daily[k];
         workDone+=(d.design||0)+(d.games||0)+(d.clients||0);
         sleepDone+=(d.sleepHours||0)*60;
-        exDone+=(d.exTotal||0);
+        exDone+=exDayHit(k)?1:0;
       });
     });
   }
@@ -6788,7 +7007,7 @@ function checkDailyTriple(dateKey){
   const d=S.daily[dateKey]||{};
   const w=(d.design||0)+(d.games||0)+(d.clients||0)>=wT;
   const sl=(d.sleepHours||0)>=slT;
-  const ex=(d.exTotal||0)>=exTgt;
+  const ex=!!S.daily[dateKey]&&exDayHit(dateKey);
   return w&&sl&&ex;
 }
 // Count daily triples in a month
@@ -6916,7 +7135,7 @@ function buildMonthlyMedalSet(wDays,sDays,eDays,mTgt,mo){
       if(!dd){hits.push(false);continue;}
       if(category==='work') hits.push((dd.design||0)+(dd.games||0)+(dd.clients||0)>=moTgt_w);
       else if(category==='sleep') hits.push((dd.sleepHours||0)>=moTgt_s);
-      else hits.push((dd.exTotal||0)>=moTgt_e);
+      else hits.push(exDayHit(k));
     }
     return hits;
   }
@@ -7093,7 +7312,7 @@ function renderMedals(){
     const exTgt2=getMonthTarget('exTarget',moKey2);
     const wHits=days.map(k=>{if(k<START)return false;const d=S.daily[k];return d&&(d.design||0)+(d.games||0)+(d.clients||0)>=wTgt2;});
     const sHits=days.map(k=>{if(k<START)return false;const d=S.daily[k];return d&&(d.sleepHours||0)>=slTgt2;});
-    const eHits=days.map(k=>{if(k<START)return false;const d=S.daily[k];return d&&(d.exTotal||0)>=exTgt2;});
+    const eHits=days.map(k=>{if(k<START)return false;const d=S.daily[k];return !!d&&exDayHit(k);});
     const allDone=wHits.every(Boolean)&&sHits.every(Boolean)&&eHits.every(Boolean);
     if(card){card.style.background=allDone?'linear-gradient(135deg,rgba(223,182,126,.22),rgba(238,73,150,.12),rgba(19,181,166,.12))':'';card.style.border=allDone?'1px solid rgba(223,182,126,.5)':'';}
     // Show perfect days in header

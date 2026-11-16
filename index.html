@@ -850,7 +850,7 @@ body.light .theme-btn{background:#fff;box-shadow:0 2px 10px rgba(60,40,10,.1)}
 .set-group-hdr:active{background:var(--bg4)}
 .set-group-arrow{font-size:12px;color:var(--muted);transition:transform .2s}
 .set-group-arrow.open{transform:rotate(180deg)}
-.set-group-body{display:none;padding:12px 14px 14px;background:var(--bg2);border-top:1px solid var(--border)}
+.set-sub{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)}.set-sub .tag{padding:1px 6px;border-radius:99px;border:1px solid var(--border);letter-spacing:.06em;font-size:9px}.set-group-body{display:none;padding:12px 14px 14px;background:var(--bg2);border-top:1px solid var(--border)}
 .set-group-body.open{display:block}
 .ratio-metric-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:var(--bg3);border:1px solid var(--border)}
 .ratio-metric-row label{flex:1;font-size:14px;font-weight:600;color:var(--text);cursor:pointer}
@@ -1098,11 +1098,6 @@ function installPWA(){
       <button onclick="document.getElementById('settings-overlay').classList.add('hidden')" style="background:var(--bg3);border:1px solid var(--border);border-radius:50%;width:28px;height:28px;font-size:14px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
 
-    <div id="native-settings" style="display:none;margin-bottom:14px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg3)">
-      <div class="mlbl" style="margin-bottom:6px">📱 Android app <span style="font-weight:400;color:var(--muted)">· v__APP_VERSION__</span></div>
-      <div id="native-settings-body"></div>
-    </div>
-
     <!-- GROUP: Appearance -->
     <div class="set-group">
       <div class="set-group-hdr" onclick="toggleSetGroup('sg-appearance')">
@@ -1226,17 +1221,27 @@ function installPWA(){
     <!-- GROUP: Notifications -->
     <div class="set-group">
       <div class="set-group-hdr" onclick="toggleSetGroup('sg-notif')">
-        <span>🔔 Notifications</span><span class="set-group-arrow" id="arr-sg-notif">▾</span>
+        <span>🔔 Notifications <span id="notif-warn" style="color:#e0a030;font-size:12px"></span></span><span class="set-group-arrow" id="arr-sg-notif">▾</span>
       </div>
       <div class="set-group-body" id="sg-notif">
+        <div class="set-sub" style="margin-top:0">🔗 Alerts <span class="tag">WEB + ANDROID</span></div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--text)">Active session banner <input type="checkbox" id="notif-active" checked onchange="saveNotifPref('active',this.checked)" style="width:18px;height:18px;accent-color:var(--work)"></label>
+          <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--text)">Entertainment warning <input type="checkbox" id="notif-ent" checked onchange="saveNotifPref('ent',this.checked)" style="width:18px;height:18px;accent-color:var(--work)"></label>
+          <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--text)">Sleep reminder <input type="checkbox" id="notif-sleep" checked onchange="saveNotifPref('sleep',this.checked)" style="width:18px;height:18px;accent-color:var(--work)"></label>
+          <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--text)">Journal prompt (10pm) <input type="checkbox" id="notif-journal" checked onchange="saveNotifPref('journal',this.checked)" style="width:18px;height:18px;accent-color:var(--work)"></label>
+        </div>
+
+        <div id="notif-web">
+        <div class="set-sub">🌐 Web app <span class="tag">BROWSER ONLY</span></div>
         <button id="notif-perm-btn" onclick="requestNotifFromBtn()" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid var(--work);background:var(--bg3);color:var(--work);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;text-align:left">🔔 Enable Notifications</button>
         <div style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">Tap above, then Allow in the browser prompt.</div>
-<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">
-  <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--text)">Active session banner <input type="checkbox" id="notif-active" checked onchange="saveNotifPref('active',this.checked)" style="width:18px;height:18px;accent-color:var(--work)"></label>
-  <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--text)">Entertainment warning <input type="checkbox" id="notif-ent" checked onchange="saveNotifPref('ent',this.checked)" style="width:18px;height:18px;accent-color:var(--work)"></label>
-  <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--text)">Sleep reminder <input type="checkbox" id="notif-sleep" checked onchange="saveNotifPref('sleep',this.checked)" style="width:18px;height:18px;accent-color:var(--work)"></label>
-  <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--text)">Journal prompt (10pm) <input type="checkbox" id="notif-journal" checked onchange="saveNotifPref('journal',this.checked)" style="width:18px;height:18px;accent-color:var(--work)"></label>
-</div>
+        </div>
+
+        <div id="native-settings" style="display:none">
+          <div class="set-sub">📱 Android app <span class="tag">v__APP_VERSION__</span></div>
+          <div id="native-settings-body"></div>
+        </div>
       </div>
     </div>
 
@@ -3071,9 +3076,12 @@ async function saveFileSmart(name,mime,text,openAfter){
 }
 async function renderNativeSettings(){
   const box=document.getElementById('native-settings');if(!box)return;
+  const webBox=document.getElementById('notif-web');if(webBox)webBox.style.display=NATIVE?'none':'';
   if(!NATIVE||!OwlfN){box.style.display='none';return;}
   box.style.display='block';
   let s={};try{s=await OwlfN.getStatus();}catch(e){}
+  const missing=['notifications','overlay','fullScreen','battery'].filter(k=>!s[k]).length;
+  const warn=document.getElementById('notif-warn');if(warn)warn.textContent=missing?'⚠ '+missing:'';
   const row=(ok,label,btn,kind)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px">${ok?'✅':'⚠️'} ${label}</span>${ok?'':`<button class="plan-mini" style="width:auto;padding:0 12px;height:30px;font-weight:700" onclick="nativeFix('${kind}')">${btn}</button>`}</div>`;
   document.getElementById('native-settings-body').innerHTML=
     row(s.notifications,'Notifications','Allow','notifications')+
@@ -3123,7 +3131,7 @@ if(NATIVE&&OwlfN){
     AppN.minimizeApp();
   });
   setInterval(()=>pushNative(true),60000);
-  window.addEventListener('load',()=>setTimeout(()=>{handleNativePending();},900));
+  window.addEventListener('load',()=>setTimeout(()=>{handleNativePending();renderNativeSettings();},900));
 }
 
 // ═══ AI TASKS (repeat-daily to-do list with cooldowns) ═══
@@ -3679,7 +3687,7 @@ function newExEntry(exId,n){const sets=[];for(let i=0;i<(n||3);i++)sets.push(new
 const e1rm=(w,r)=>(w>0&&r>0&&r<=12)?(r===1?w:w*(1+r/30)):null;
 function exSessions(exId,excludeWid){
   const out=[];
-  liveW().forEach(w=>{if(w.id===excludeWid)return;(w.exercises||[]).forEach(ex=>{if(ex.exId!==exId)return;const sets=(ex.sets||[]).filter(s=>s.done);if(sets.length)out.push({wid:w.id,date:w.date,start:w.start,sets});});});
+  liveW().forEach(w=>{if(w.id===excludeWid||w.snack)return;(w.exercises||[]).forEach(ex=>{if(ex.exId!==exId)return;const sets=(ex.sets||[]).filter(s=>s.done);if(sets.length)out.push({wid:w.id,date:w.date,start:w.start,sets});});});
   return out.sort((a,b)=>b.start-a.start);
 }
 function bestOf(sessions,extra){
@@ -3731,7 +3739,7 @@ function commitWorkoutDay(date){
   const d=ensureDay(date);
   const sumT=a=>a.reduce((s,e)=>s+(e.total||0),0);
   const fresh={};
-  liveW().filter(w=>w.date===date).forEach(w=>(w.exercises||[]).forEach(entry=>{
+  liveW().filter(w=>w.date===date&&!w.snack).forEach(w=>(w.exercises||[]).forEach(entry=>{
     const lib=exById(entry.exId);if(!lib)return;
     const done=(entry.sets||[]).filter(s=>s.done);if(!done.length)return;
     const work=done.filter(s=>s.type!=='W');
@@ -3766,11 +3774,12 @@ function wkSave(w,commit){
   if(commit)syncActiveToFirestore();
 }
 // ---- starting / finishing ----
-function wkStart(exIds,name,routineId,counts){
+function wkStart(exIds,name,routineId,counts,rt){
   if(activeWorkout()){openWorkout();return;}
   const now=Date.now();
   const w={id:uid(),date:tk(),start:now,end:null,name:name||'',routineId:routineId||null,exercises:[],deleted:false,updated:now};
-  (exIds||[]).forEach((id,i)=>{if(exById(id))w.exercises.push(newExEntry(id,(counts&&counts[i])||3));});
+  if(rt&&rt.note)w.rnote=rt.note;
+  (exIds||[]).forEach((id,i)=>{if(!exById(id))return;const en=newExEntry(id,(counts&&counts[i])||3),it=rt&&rt.items&&rt.items[i];if(it){if(it.reps)en.target=String(it.reps);if(it.rest>0)en.restSec=it.rest;}w.exercises.push(en);});
   S.workouts.push(w);wkSave(w);openWorkout();
 }
 function openWorkout(){document.getElementById('wk-overlay').classList.remove('hidden');renderWorkout();}
@@ -3847,6 +3856,7 @@ setInterval(()=>{
   }
 },1000);
 // ---- workout screen ----
+let _wkNoteOpen=false;
 function renderWorkout(){
   const ov=document.getElementById('wk-overlay');
   if(!ov||ov.classList.contains('hidden'))return;
@@ -3857,6 +3867,7 @@ function renderWorkout(){
   document.getElementById('wk-stats').innerHTML=`<span id="wk-clock">${fmtSec(Math.floor((Date.now()-w.start)/1000))}</span> · ${st.sets} sets · ${fmtW(st.vol)} ${wUnit()}`;
   renderRest();
   const body=document.getElementById('wk-body'),scroll=body.scrollTop;
+  const noteCard=w.rnote?`<details ${_wkNoteOpen?'open':''} ontoggle="_wkNoteOpen=this.open" style="margin-bottom:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg3)"><summary style="font-size:12px;font-weight:700;color:var(--ex);cursor:pointer">📋 Warm-up · cool-down · rules</summary><div style="white-space:pre-line;font-size:12px;line-height:1.6;margin-top:8px;color:var(--text)">${escapeHtml(w.rnote)}</div></details>`:'';
   const blocks=(w.exercises||[]).map((en,i)=>{
     const lib=exById(en.exId)||{name:'(unknown exercise)',kind:'wr',muscle:'',equip:''};
     const kind=lib.kind,hasW=kind==='wr'||kind==='bwr',hasR=kind!=='time';
@@ -3875,11 +3886,11 @@ function renderWorkout(){
       return `<div class="wk-set${s.done?' done':''}" style="grid-template-columns:${cols}"><button class="wk-sn t-${s.type}" onclick="wkSetMenu(${i},${j})">${lbl}</button><button class="wk-prev" onclick="wkFillPrev(${i},${j})">${pv?fmtSet(pv,kind):'—'}</button>${inW}${inR}${inT}<button class="wk-ck" onclick="wkToggleSet(${i},${j})">✓</button></div>${s.done&&s.pr&&s.pr.length?`<div class="wk-pr">🏆 PR · ${s.pr.join(' · ')}</div>`:''}`;
     }).join('');
     return `<div class="wk-ex"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="wk-ex-name" onclick="showExHistory('${en.exId}')">${escapeHtml(lib.name)}</span><button class="plan-mini" onclick="wkExMenu(${i})">⋯</button></div>
-      <div style="font-size:10px;color:var(--muted);margin:2px 0 6px">${[lib.muscle,lib.equip].filter(Boolean).join(' · ')}${last?' · Last: '+last.sets.filter(s=>s.type!=='W').slice(0,4).map(s=>fmtSet(s,kind)).join(', '):''}</div>
+      ${en.target?`<div style="font-size:12px;font-weight:700;color:var(--ex);margin:3px 0 0">🎯 ${en.sets.filter(x=>x.type!=='W').length} × ${escapeHtml(en.target)}${en.restSec?` · rest ${en.restSec}s`:''}</div>`:''}<div style="font-size:10px;color:var(--muted);margin:2px 0 6px">${[lib.muscle,lib.equip].filter(Boolean).join(' · ')}${last?' · Last: '+last.sets.filter(s=>s.type!=='W').slice(0,4).map(s=>fmtSet(s,kind)).join(', '):''}</div>
       ${en.note?`<div style="font-size:11px;color:var(--muted);font-style:italic;margin-bottom:6px">📝 ${escapeHtml(en.note)}</div>`:''}
       ${head}${rows}<button class="plan-btn" style="width:100%;margin-top:6px;padding:8px" onclick="wkAddSet(${i})">＋ Add set</button></div>`;
   }).join('');
-  body.innerHTML=blocks+`<div style="padding:4px 0 90px"><button class="plan-btn pri" style="width:100%;padding:13px" onclick="showPicker('add')">＋ Add exercise</button><button class="plan-btn" style="width:100%;margin-top:8px;color:#e0524d;border-color:#e0524d" onclick="wkCancel()">Discard workout</button></div>`;
+  body.innerHTML=noteCard+blocks+`<div style="padding:4px 0 90px"><button class="plan-btn pri" style="width:100%;padding:13px" onclick="showPicker('add')">＋ Add exercise</button><button class="plan-btn" style="width:100%;margin-top:8px;color:#e0524d;border-color:#e0524d" onclick="wkCancel()">Discard workout</button></div>`;
   body.scrollTop=scroll;
 }
 function _wkCtx(i,j){const w=activeWorkout();if(!w)return{};const en=w.exercises[i];return{w,en,s:en&&j!=null?en.sets[j]:null};}
@@ -3957,7 +3968,7 @@ function showPicker(mode,ctx,keepSel){
   pkRender();
 }
 function pkRecent(){
-  const m={};liveW().forEach(w=>(w.exercises||[]).forEach(en=>{if(en.sets.some(s=>s.done))m[en.exId]=Math.max(m[en.exId]||0,w.start);}));
+  const m={};liveW().filter(w=>!w.snack).forEach(w=>(w.exercises||[]).forEach(en=>{if(en.sets.some(s=>s.done))m[en.exId]=Math.max(m[en.exId]||0,w.start);}));
   return Object.keys(m).sort((a,b)=>m[b]-m[a]).filter(id=>exById(id)&&!exById(id).archived);
 }
 function pkRender(){
@@ -4006,6 +4017,7 @@ function showExEdit(id,ret){
    <div style="display:flex;gap:8px"><div style="flex:1;min-width:0"><label class="mlbl">Muscle</label><select id="xe-muscle">${opt(MUSCLES,x&&x.muscle)}</select></div><div style="flex:1;min-width:0"><label class="mlbl">Equipment</label><select id="xe-equip">${opt(EQUIPS,x&&x.equip)}</select></div></div>
    <label class="mlbl">How do you record it?</label><select id="xe-kind">${Object.keys(KINDS).map(k=>`<option value="${k}"${x&&x.kind===k?' selected':''}>${KINDS[k]}</option>`).join('')}</select>
    <label class="mlbl">Default rest (seconds, 0 = app default)</label><input type="number" id="xe-rest" value="${x&&x.restSec?x.restSec:''}" min="0" max="900">
+   <label class="mlbl">Quick-snack amount (adds a one-tap button on the Exercise page; 0 = none)</label><input type="number" id="xe-snack" value="${x&&x.snackN?x.snackN:''}" min="0" max="999" placeholder="e.g. 12">
    <div class="mbtns" style="margin-top:12px"><button class="bcanc" onclick="exEditBack('${ret||'browse'}')">Cancel</button><button class="bconf" style="background:var(--ex);color:#001a19" onclick="saveExEdit('${id||''}','${ret||'browse'}')">Save</button></div>
    ${x?`<button class="bcanc" style="width:100%;margin-top:8px;${x.archived?'':'border-color:#e0524d;color:#e0524d'}" onclick="archiveEx('${x.id}','${ret||'browse'}')">${x.archived?'♻ Restore':'🗄 Archive (keeps your history)'}</button>`:''}`,null);
   if(!x)setTimeout(()=>document.getElementById('xe-name')?.focus(),80);
@@ -4014,7 +4026,7 @@ function exEditBack(ret,sel){showPicker(ret,_pk.ctx,sel);}
 function saveExEdit(id,ret){
   const name=(document.getElementById('xe-name').value||'').trim();
   if(!name){alert('Give the exercise a name.');return;}
-  const f={name,muscle:document.getElementById('xe-muscle').value,equip:document.getElementById('xe-equip').value,kind:document.getElementById('xe-kind').value,restSec:Math.max(0,parseInt(document.getElementById('xe-rest').value)||0)};
+  const f={name,muscle:document.getElementById('xe-muscle').value,equip:document.getElementById('xe-equip').value,kind:document.getElementById('xe-kind').value,restSec:Math.max(0,parseInt(document.getElementById('xe-rest').value)||0),snackN:Math.max(0,parseInt(document.getElementById('xe-snack').value)||0)};
   let x=id?exById(id):null;
   if(x)Object.assign(x,f);else{x={id:uid(),legacyKey:null,fav:false,note:'',archived:false,created:new Date().toISOString(),...f};S.exLib.push(x);}
   x.updated=Math.max(Date.now(),(x.updated||0)+1);
@@ -4051,55 +4063,221 @@ function showExHistory(exId){
 }
 // ---- routines ----
 let _rtDraft=null;
+const DOW_SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],DOW_LONG=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const dowOrder=d=>d==null?9:(d+6)%7;   // Monday first
+const sortedRoutines=()=>(S.routines||[]).filter(r=>!r.deleted).sort((a,b)=>dowOrder(a.day)-dowOrder(b.day)||String(a.name).localeCompare(String(b.name)));
+const itemText=it=>(exById(it.exId)||{name:'?'}).name+' '+it.sets+(it.reps?'×'+it.reps:' sets');
 function showRoutines(){
-  const rs=(S.routines||[]).filter(r=>!r.deleted);
-  const rows=rs.map(r=>`<div style="padding:9px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="min-width:0" onclick="showRoutineEdit('${r.id}')" ><div style="font-size:14px;font-weight:700">${escapeHtml(r.name)}</div><div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.items.map(it=>(exById(it.exId)||{name:'?'}).name+' ×'+it.sets).join(' · ')}</div></div><button class="plan-btn pri" style="flex:none;padding:7px 14px" onclick="startRoutine('${r.id}')">▶ Start</button></div></div>`).join('')||'<div style="font-size:12px;color:var(--muted);padding:8px 0;line-height:1.6">No routines yet. Finish a workout and tick “Save as routine”, or create one here.</div>';
-  showModal(`<h3 style="color:var(--ex)">📋 Routines</h3><div style="max-height:46vh;overflow-y:auto">${rows}</div><div class="mbtns" style="margin-top:12px"><button class="bcanc" onclick="closeModal()">Close</button><button class="bconf" style="background:var(--ex);color:#001a19" onclick="showRoutineEdit('')">＋ New</button></div>`,null);
+  const rs=sortedRoutines();
+  const rows=rs.map(r=>`<div style="padding:9px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="min-width:0;flex:1" onclick="showRoutineEdit('${r.id}')"><div style="font-size:14px;font-weight:700">${r.day!=null?`<span style="font-size:10px;font-weight:700;color:var(--ex);border:1px solid var(--ex);border-radius:99px;padding:1px 7px;margin-right:6px">${DOW_SHORT[r.day]}</span>`:''}${escapeHtml(r.name)} <span style="font-size:11px;color:var(--muted)">✎</span></div><div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.items.map(itemText).join(' · ')}</div></div><button class="plan-btn pri" style="flex:none;padding:7px 14px" onclick="startRoutine('${r.id}')">▶ Start</button></div></div>`).join('')||'<div style="font-size:12px;color:var(--muted);padding:8px 0;line-height:1.6">No routines yet. Finish a workout and tick “Save as routine”, or create one here.</div>';
+  showModal(`<h3 style="color:var(--ex)">📋 Routines</h3><div style="max-height:44vh;overflow-y:auto">${rows}</div>
+   <div style="display:flex;gap:8px;margin-top:10px"><button class="plan-btn" style="flex:1" onclick="showWeekPlan()">🗓 Week plan</button><button class="plan-btn" style="flex:1" onclick="restorePreset()">📥 Restore my plan</button></div>
+   <div class="mbtns" style="margin-top:12px"><button class="bcanc" onclick="closeModal()">Close</button><button class="bconf" style="background:var(--ex);color:#001a19" onclick="showRoutineEdit('')">＋ New</button></div>`,null);
 }
 function startRoutine(id){
   const r=(S.routines||[]).find(x=>x.id===id);if(!r)return;
   closeModal();
   if(activeWorkout()){openWorkout();return;}
-  wkStart(r.items.map(i=>i.exId),r.name,r.id,r.items.map(i=>i.sets));
+  wkStart(r.items.map(i=>i.exId),r.name,r.id,r.items.map(i=>i.sets),r);
 }
 function showRoutineEdit(id,keep){
-  if(!keep){const r=id?(S.routines||[]).find(x=>x.id===id):null;_rtDraft=r?{id:r.id,name:r.name,items:r.items.map(i=>({...i}))}:{id:'',name:'',items:[]};}
-  const d=_rtDraft;
+  if(!keep){const r=id?(S.routines||[]).find(x=>x.id===id):null;_rtDraft=r?{id:r.id,name:r.name,day:r.day==null?null:r.day,note:r.note||'',preset:!!r.preset,items:r.items.map(i=>({...i}))}:{id:'',name:'',day:null,note:'',items:[]};}
+  const d=_rtDraft,n=d.items.length;
+  const itemRows=d.items.map((it,i)=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:6px"><span style="flex:1;font-size:13px;font-weight:700;min-width:0">${escapeHtml((exById(it.exId)||{name:'?'}).name)}</span><button class="plan-mini" ${i?'':'disabled style="opacity:.3"'} onclick="rtMove(${i},-1)">▲</button><button class="plan-mini" ${i<n-1?'':'disabled style="opacity:.3"'} onclick="rtMove(${i},1)">▼</button><button class="plan-mini" onclick="_rtDraft.items.splice(${i},1);showRoutineEdit('',true)">✕</button></div>
+     <div style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:10px;color:var(--muted);flex-wrap:wrap"><input type="number" inputmode="numeric" min="1" max="12" value="${it.sets}" style="width:58px;padding:8px 4px;text-align:center;margin:0" onchange="_rtDraft.items[${i}].sets=Math.max(1,parseInt(this.value)||3)">sets ×<input type="text" value="${escapeHtml(it.reps||'')}" placeholder="8–12" style="width:84px;padding:8px 4px;text-align:center;margin:0" onchange="_rtDraft.items[${i}].reps=this.value.trim()">reps ·<input type="number" inputmode="numeric" min="0" max="900" value="${it.rest||''}" placeholder="auto" style="width:66px;padding:8px 4px;text-align:center;margin:0" onchange="_rtDraft.items[${i}].rest=Math.max(0,parseInt(this.value)||0)">s rest</div></div>`).join('')||'<div style="font-size:12px;color:var(--muted);padding:8px 0">No exercises yet.</div>';
   showModal(`<h3 style="color:var(--ex)">${d.id?'✎ Edit routine':'＋ New routine'}</h3>
    <label class="mlbl">Name</label><input type="text" id="rt-name" value="${escapeHtml(d.name)}" oninput="_rtDraft.name=this.value" placeholder="e.g. Push day" style="border-color:var(--ex)">
-   <div style="max-height:34vh;overflow-y:auto">${d.items.map((it,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)"><span style="flex:1;font-size:13px;min-width:0">${escapeHtml((exById(it.exId)||{name:'?'}).name)}</span><input type="number" min="1" max="12" value="${it.sets}" style="width:54px;margin:0" onchange="_rtDraft.items[${i}].sets=Math.max(1,parseInt(this.value)||3)"><span style="font-size:10px;color:var(--muted)">sets</span><button class="plan-mini" onclick="_rtDraft.items.splice(${i},1);showRoutineEdit('',true)">✕</button></div>`).join('')||'<div style="font-size:12px;color:var(--muted);padding:8px 0">No exercises yet.</div>'}</div>
+   <label class="mlbl">Planned day</label><select onchange="_rtDraft.day=this.value===''?null:parseInt(this.value)"><option value="">No fixed day</option>${[1,2,3,4,5,6,0].map(k=>`<option value="${k}"${d.day===k?' selected':''}>${DOW_LONG[k]}</option>`).join('')}</select>
+   <div style="max-height:30vh;overflow-y:auto">${itemRows}</div>
    <button class="plan-btn" style="width:100%;margin-top:8px" onclick="showPicker('routine')">＋ Add exercise</button>
+   <label class="mlbl" style="margin-top:10px">Notes (warm-up, cool-down, rules — shown during the workout)</label>
+   <textarea oninput="_rtDraft.note=this.value" style="width:100%;min-height:84px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;line-height:1.5;font-family:inherit">${escapeHtml(d.note)}</textarea>
    <div class="mbtns" style="margin-top:12px"><button class="bcanc" onclick="showRoutines()">Back</button><button class="bconf" style="background:var(--ex);color:#001a19" onclick="saveRoutine()">Save</button></div>
+   ${d.preset&&PRESET_RT.some(p=>p.id===d.id)?`<button class="bcanc" style="width:100%;margin-top:8px" onclick="resetRoutineToPreset('${d.id}')">↺ Reset to my plan's defaults</button>`:''}
    ${d.id?`<button class="bcanc" style="width:100%;margin-top:8px;border-color:#e0524d;color:#e0524d" onclick="deleteRoutine('${d.id}')">🗑 Delete routine</button>`:''}`,null);
 }
+function rtMove(i,dir){const a=_rtDraft.items,j=i+dir;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];showRoutineEdit('',true);}
 function saveRoutine(){
   const d=_rtDraft;d.name=(document.getElementById('rt-name').value||'').trim();
   if(!d.name){alert('Name the routine.');return;}
   if(!d.items.length){alert('Add at least one exercise.');return;}
   let r=d.id?S.routines.find(x=>x.id===d.id):null;
-  if(r){r.name=d.name;r.items=d.items;}else{r={id:uid(),name:d.name,items:d.items,deleted:false,created:new Date().toISOString()};S.routines.push(r);}
+  if(r){r.name=d.name;r.items=d.items;r.day=d.day;r.note=d.note;}else{r={id:uid(),name:d.name,items:d.items,day:d.day,note:d.note,deleted:false,created:new Date().toISOString()};S.routines.push(r);}
   r.updated=Math.max(Date.now(),(r.updated||0)+1);
-  save();syncExMetaSoon();showRoutines();
+  save();syncExMetaSoon();showRoutines();renderWkHome();
 }
-function deleteRoutine(id){const r=S.routines.find(x=>x.id===id);if(!r)return;r.deleted=true;r.updated=Math.max(Date.now(),(r.updated||0)+1);save();syncExMetaSoon();showRoutines();}
+function deleteRoutine(id){const r=S.routines.find(x=>x.id===id);if(!r)return;r.deleted=true;r.updated=Math.max(Date.now(),(r.updated||0)+1);save();syncExMetaSoon();showRoutines();renderWkHome();}
+
+// ═══ MY PLAN PRESET — Upper/Lower A/B + exercise snacking (all of it stays editable) ═══
+const PRESET_WARM='🔥 Warm-up · 4 min\n1. Treadmill or bike — 1 min\n2. Arm circles + shoulder mobility — 1 min\n3. Hip + knee dynamic moves — 1 min\n4. Light warm-up set of the first exercise — 1 min';
+const PRESET_RULES='Rules: stop every set with 2–3 reps left · rest 45–75 s depending on the lift · form before speed · no max-weight tests.';
+const PRESET_COOL_UP='🧘 Cool-down · 6 min (gentle, never to pain)\nChest stretch 30 s/side · Shoulder stretch 30 s/side · Triceps stretch 30 s/side · Upper back stretch 2 × 30 s';
+const PRESET_COOL_LO='🧘 Cool-down · 6 min (gentle, never to pain)\nQuadriceps stretch 30 s/side · Hamstring stretch 30 s/side · Calf stretch 30 s/side · Glute stretch 30 s/side';
+// id, name, muscle, equipment, kind, default rest s, snack amount, note
+const PRESET_EX=[
+ ['p_chestpress','Chest Press','Chest','Machine','wr',75],
+ ['p_bicepcurl','Bicep Curl','Biceps','Dumbbell','wr',45],
+ ['p_incpress','Incline Chest Press','Chest','Machine','wr',75],
+ ['p_goblet','Goblet Squat','Quads','Dumbbell','wr',75],
+ ['p_deadbug','Dead Bug','Core','Bodyweight','br',45,8,'Reps are per side.'],
+ ['p_revcrunch','Reverse Crunch','Core','Bodyweight','br',0,12],
+ ['p_legraise','Lying Leg Raise','Core','Bodyweight','br',0,12],
+ ['p_cardio','Easy Bike / Walk','Full body','Other','time',0,0,'Log the time in seconds, e.g. 1200 = 20 min.']
+];
+// id, name, weekday (0=Sun), notes, items [exercise id, sets, reps, rest s]
+const PRESET_RT=[
+ {id:'p_upperA',name:'Upper A',day:1,note:PRESET_WARM+'\n\n'+PRESET_RULES+'\n\n'+PRESET_COOL_UP,items:[['p_chestpress',2,'8–12',75],['s_pulldown',2,'8–12',75],['s_lat',2,'10–12',45],['p_bicepcurl',2,'10–12',45]]},
+ {id:'p_lowerA',name:'Lower A',day:2,note:PRESET_WARM+'\n\n'+PRESET_RULES+'\n\n'+PRESET_COOL_LO,items:[['s_legpress',2,'10–12',75],['s_legcurl',2,'10–12',60],['s_calf',2,'12',45],['s_plank',2,'20–30 s',45]]},
+ {id:'p_upperB',name:'Upper B',day:4,note:PRESET_WARM+'\n\n'+PRESET_RULES+'\n\n'+PRESET_COOL_UP,items:[['p_incpress',2,'8–12',75],['s_cablerow',2,'8–12',75],['s_facepull',2,'10–12',45],['s_pushdown',2,'10–12',45]]},
+ {id:'p_lowerB',name:'Lower B',day:5,note:PRESET_WARM+'\n\n'+PRESET_RULES+'\n\n'+PRESET_COOL_LO,items:[['p_goblet',2,'8–12',75],['s_rdl',2,'8–12',75],['s_hipthrust',2,'10–12',75],['p_deadbug',2,'8 / side',45]]},
+ {id:'p_cardio',name:'Light Cardio',day:6,note:'Easy bike or a walk, 15–25 min. Log the time in seconds (1200 = 20 min). Other days: free light activity, no hard cardio needed.',items:[['p_cardio',1,'15–25 min',0]]}
+];
+const presetItems=p=>p.items.map(([exId,sets,reps,rest])=>({exId,sets,reps,rest}));
+// Adds what is missing. Fixed ids + updated:0 mean any edit you make (on any device) always wins over the preset.
+function installPreset(){
+  seedExLib();
+  let added=0;
+  PRESET_EX.forEach(r=>{if(!S.exLib.some(x=>x.id===r[0])){S.exLib.push({id:r[0],name:r[1],muscle:r[2],equip:r[3],kind:r[4],legacyKey:null,fav:false,restSec:r[5]||0,snackN:r[6]||0,note:r[7]||'',archived:false,created:'preset',updated:0});added++;}});
+  const pl=S.exLib.find(x=>x.id==='s_plank');
+  if(pl&&pl.snackN===undefined){pl.snackN=30;pl.updated=Math.max(Date.now(),(pl.updated||0)+1);}
+  PRESET_RT.forEach(p=>{if(!S.routines.some(x=>x.id===p.id)){S.routines.push({id:p.id,name:p.name,day:p.day,note:p.note,items:presetItems(p),deleted:false,preset:true,created:'preset',updated:0});added++;}});
+  S.presetV=1;refreshExKeys();save();syncExMetaSoon();
+  return added;
+}
+// Brings back preset routines you deleted (never touches ones you still have)
+function restorePreset(){
+  installPreset();
+  let back=0;
+  PRESET_RT.forEach(p=>{const r=S.routines.find(x=>x.id===p.id);if(r&&r.deleted){Object.assign(r,{name:p.name,day:p.day,note:p.note,items:presetItems(p),deleted:false,preset:true});r.updated=Math.max(Date.now(),(r.updated||0)+1);back++;}});
+  save();syncExMetaSoon();showRoutines();renderWkHome();
+  toast('📥',back?'Restored '+back+' routine'+(back>1?'s':''):'Plan is up to date',back?'Back to the preset values':'Nothing was missing');
+}
+function resetRoutineToPreset(id){
+  const p=PRESET_RT.find(x=>x.id===id),r=(S.routines||[]).find(x=>x.id===id);if(!p||!r)return;
+  if(!confirm('Reset "'+p.name+'" to the preset sets, reps, rest, day and notes?'))return;
+  Object.assign(r,{name:p.name,day:p.day,note:p.note,items:presetItems(p),deleted:false});
+  r.updated=Math.max(Date.now(),(r.updated||0)+1);save();syncExMetaSoon();showRoutines();renderWkHome();
+}
+// ---- week plan ----
+function setDayRoutine(dow,rid){
+  const now=Date.now();
+  (S.routines||[]).forEach(r=>{
+    const want=!!rid&&r.id===rid;
+    if(want&&r.day!==dow){r.day=dow;r.updated=Math.max(now,(r.updated||0)+1);}
+    else if(!want&&r.day===dow){r.day=null;r.updated=Math.max(now,(r.updated||0)+1);}
+  });
+  save();syncExMetaSoon();renderWkHome();showWeekPlan();
+}
+function showWeekPlan(){
+  const rs=sortedRoutines();
+  const rows=[1,2,3,4,5,6,0].map(dow=>{
+    const cur=rs.find(r=>r.day===dow);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)"><span style="width:86px;font-size:13px;font-weight:700;color:${cur?'var(--text)':'var(--muted)'}">${DOW_LONG[dow]}</span><select style="flex:1;margin:0" onchange="setDayRoutine(${dow},this.value)"><option value="">Rest / free activity</option>${rs.map(r=>`<option value="${r.id}"${cur&&cur.id===r.id?' selected':''}>${escapeHtml(r.name)}</option>`).join('')}</select></div>`;
+  }).join('');
+  showModal(`<h3 style="color:var(--ex)">🗓 Week plan</h3><div style="font-size:11px;color:var(--muted);margin-bottom:6px;line-height:1.5">Pick what each day is. A routine can sit on one day; choosing it elsewhere moves it. Rest days count as part of the plan.</div>${rows}
+   <div class="mbtns" style="margin-top:12px"><button class="bcanc" onclick="showRoutines()">Back</button><button class="bconf" style="background:var(--ex);color:#001a19" onclick="closeModal()">Done</button></div>`,null);
+}
+const todayDow=()=>myDate().getUTCDay();
+const todayRoutine=()=>sortedRoutines().find(r=>r.day===todayDow())||null;
+const addDaysKey=(k,n)=>{const[y,m,d]=k.split('-').map(Number);return new Date(Date.UTC(y,m-1,d+n)).toISOString().slice(0,10);};
+const dowOfKey=k=>{const[y,m,d]=k.split('-').map(Number);return new Date(Date.UTC(y,m-1,d)).getUTCDay();};
+const formalDone=date=>liveW().some(w=>!w.snack&&w.end&&w.date===date&&(w.exercises||[]).some(en=>en.sets.some(s=>s.done)));
+// ---- exercise snacks: one-tap core sets, kept apart from formal training ----
+function snackW(date){
+  let w=liveW().filter(x=>x.snack&&x.date===date).sort((a,b)=>a.start-b.start)[0];
+  if(!w){const now=Date.now();w={id:uid(),date,start:now,end:now,name:'Exercise snacks',routineId:null,snack:true,exercises:[],deleted:false,updated:now};S.workouts.push(w);}
+  return w;
+}
+function snackStats(from,to){
+  const out={sets:0,reps:0,secs:0,days:new Set(),by:{}};
+  liveW().filter(w=>w.snack&&w.date>=from&&w.date<=to).forEach(w=>(w.exercises||[]).forEach(en=>{
+    const x=exById(en.exId)||{name:'?',kind:'br'};
+    en.sets.forEach(s=>{
+      if(!s.done)return;out.sets++;out.days.add(w.date);
+      const b=out.by[en.exId]=out.by[en.exId]||{name:x.name,kind:x.kind,sets:0,reps:0,secs:0};b.sets++;
+      if(x.kind==='time'){b.secs+=s.t||0;out.secs+=s.t||0;}else{b.reps+=s.r||0;out.reps+=s.r||0;}
+    });
+  }));
+  return out;
+}
+function snackAdd(exId){
+  const x=exById(exId);if(!x||!(x.snackN>0))return;
+  const w=snackW(tk()),now=Date.now();
+  let en=w.exercises.find(e=>e.exId===exId);
+  if(!en){en={id:uid(),exId,note:'',restSec:0,sets:[]};w.exercises.push(en);}
+  const s=newSet();s.done=true;s.ts=now;
+  if(x.kind==='time')s.t=x.snackN;else s.r=x.snackN;
+  en.sets.push(s);w.end=Math.max(w.end||0,now);
+  wkSave(w);                     // no commitWorkoutDay: snacks never feed the formal daily totals / streak
+  toast('⚡','+'+x.snackN+(x.kind==='time'?' s ':' ')+x.name,'Logged at '+new Date(now).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+  renderWkHome();
+}
+function snackUndo(){
+  const ws=liveW().filter(w=>w.snack&&w.date===tk());let last=null;
+  ws.forEach(w=>w.exercises.forEach(en=>en.sets.forEach(s=>{if(!last||(s.ts||0)>(last.s.ts||0))last={w,en,s};})));
+  if(!last)return;
+  last.en.sets=last.en.sets.filter(s=>s!==last.s);
+  last.w.exercises=last.w.exercises.filter(en=>en.sets.length);
+  if(!last.w.exercises.length)last.w.deleted=true;
+  wkSave(last.w);renderWkHome();
+}
+const snackExercises=()=>(S.exLib||[]).filter(x=>!x.archived&&x.snackN>0);
+function snackUnit(x){return x.kind==='time'?' s':(x.id==='p_deadbug'?' /side':'');}
+function showSnackCfg(){
+  const xs=snackExercises();
+  showModal(`<h3 style="color:var(--ex)">⚡ Snack amounts</h3><div style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5">What one tap adds. Set 0 to remove a button. To add another exercise: Exercises → edit → “Quick-snack amount”.</div>
+   ${xs.map(x=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)"><span style="flex:1;font-size:13px;font-weight:700">${escapeHtml(x.name)}</span><input type="number" inputmode="numeric" min="0" max="999" value="${x.snackN}" style="width:64px;margin:0" onchange="snackSetN('${x.id}',this.value)"><span style="font-size:11px;color:var(--muted);width:44px">${x.kind==='time'?'seconds':'reps'}</span></div>`).join('')||'<div style="font-size:12px;color:var(--muted)">No snack exercises yet.</div>'}
+   <div class="mbtns" style="margin-top:12px"><button class="bconf" style="background:var(--ex);color:#001a19" onclick="closeModal();renderWkHome()">Done</button></div>`,null);
+}
+function snackSetN(id,v){const x=exById(id);if(!x)return;x.snackN=Math.max(0,parseInt(v)||0);x.updated=Math.max(Date.now(),(x.updated||0)+1);save();syncExMetaSoon();}
+function snackCard(){
+  const xs=snackExercises(),today=tk(),wk=weekKey(today);
+  const td=snackStats(today,today),wsx=snackStats(wk,addDaysKey(wk,6));
+  const fmtBy=b=>b.kind==='time'?b.secs+' s':b.reps;
+  const weekLine=Object.keys(wsx.by).map(id=>`${escapeHtml(wsx.by[id].name)} <b style="color:var(--text)">${fmtBy(wsx.by[id])}</b>`).join(' · ');
+  return `<div style="margin-top:10px;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--bg3)">
+   <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--ex);white-space:nowrap">⚡ CORE SNACKS</div><div><button class="plan-mini" style="width:auto;padding:0 9px;height:26px;font-size:11px;font-weight:700;white-space:nowrap" onclick="snackUndo()" ${td.sets?'':'disabled'}>↩ Undo</button> <button class="plan-mini" style="width:auto;padding:0 9px;height:26px;font-size:11px;font-weight:700;white-space:nowrap" onclick="showSnackCfg()">✎ Amounts</button></div></div>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${xs.map(x=>`<button class="plan-btn" style="padding:11px 6px;font-weight:700;line-height:1.25" onclick="snackAdd('${x.id}')">+${x.snackN}${snackUnit(x)}<br><span style="font-size:11px;font-weight:600;color:var(--muted)">${escapeHtml(x.name)}</span></button>`).join('')||'<div style="grid-column:1/3;font-size:12px;color:var(--muted)">No snack buttons — tap ✎ Amounts.</div>'}</div>
+   <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">Today: <b style="color:var(--text)">${td.sets}</b> snack${td.sets===1?'':'s'}${td.reps?` · ${td.reps} reps`:''}${td.secs?` · ${td.secs} s plank`:''}<br>This week: <b style="color:var(--text)">${wsx.days.size}</b>/3 core days · ${wsx.sets} snacks${weekLine?'<br>'+weekLine:''}<br><span style="opacity:.8">Counted separately from your workouts.</span></div></div>`;
+}
+// ---- week strip + today's session ----
+function weekStrip(){
+  const today=tk(),wk=weekKey(today),rs=sortedRoutines();let planned=0,done=0;
+  const cells=[0,1,2,3,4,5,6].map(i=>{
+    const k=addDaysKey(wk,i),dow=dowOfKey(k),r=rs.find(x=>x.day===dow),isDone=formalDone(k),isToday=k===today;
+    let sym,col;
+    if(r){planned++;if(isDone){done++;sym='✓';col='#3fa66b';}else if(k<today){sym='✗';col='var(--muted)';}else{sym='○';col='var(--ex)';}}
+    else{sym=isDone?'✓':'·';col=isDone?'#3fa66b':'var(--muted)';}
+    return `<div style="flex:1;text-align:center;padding:5px 0;border-radius:8px;${isToday?'border:1px solid var(--ex);':'border:1px solid transparent;'}"><div style="font-size:9px;color:var(--muted);font-weight:700">${DOW_SHORT[dow].toUpperCase()}</div><div style="font-size:15px;font-weight:700;color:${col};line-height:1.3">${sym}</div><div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r?escapeHtml(r.name.replace(/^Light /,'')):'rest'}</div></div>`;
+  }).join('');
+  return `<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--muted)">THIS WEEK</span><span style="font-size:11px;color:var(--muted)">${planned?`<b style="color:var(--text)">${done}/${planned}</b> planned sessions done${planned?` · ${Math.round(done/planned*100)}%`:''}`:'No plan set'}</span></div><div style="display:flex;gap:3px;margin-top:4px">${cells}</div></div>`;
+}
+function todayCard(){
+  const r=todayRoutine(),today=tk(),dn=DOW_LONG[todayDow()];
+  if(!r)return `<div style="margin-top:8px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--bg3)"><div style="font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted)">${dn.toUpperCase()}</div><div style="font-size:15px;font-weight:700;margin-top:2px">😴 Rest day</div><div style="font-size:11px;color:var(--muted);margin-top:2px">Recovery is part of the plan — light activity is fine.</div></div>`;
+  const did=liveW().some(w=>!w.snack&&w.end&&w.date===today&&w.routineId===r.id&&(w.exercises||[]).some(en=>en.sets.some(s=>s.done)));
+  return `<div style="margin-top:8px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--ex);background:color-mix(in srgb,var(--ex) 8%,transparent)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="min-width:0"><div style="font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--ex)">${dn.toUpperCase()} · TODAY${did?' · ✓ DONE':''}</div><div style="font-size:18px;font-weight:700;margin-top:2px">${escapeHtml(r.name)}</div><div style="font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5">${r.items.map(itemText).join(' · ')}</div></div><button class="plan-btn pri" style="flex:none;padding:11px 16px;background:var(--ex);border-color:var(--ex);color:#001a19;font-weight:700" onclick="startRoutine('${r.id}')">${did?'↻ Again':'▶ Start'}</button></div></div>`;
+}
 // ---- Exercise page home + weekly muscle volume ----
 function renderWkHome(){
   const el=document.getElementById('wk-home');if(!el)return;
   seedExLib();
+  if(S.presetV!==1)installPreset();
   const w=activeWorkout(),today=tk();
   let h='';
   if(w){
     const st=wkStats(w);
     h+=`<div onclick="openWorkout()" style="cursor:pointer;margin-top:8px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--ex);background:color-mix(in srgb,var(--ex) 10%,transparent)"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--ex)">● WORKOUT IN PROGRESS</div><div style="font-size:12px;color:var(--muted);margin-top:2px">${(w.exercises||[]).length} exercises · ${st.sets} sets</div></div><div style="text-align:right"><div id="wk-home-clock" style="font-family:'Space Mono',monospace;font-size:18px;color:var(--ex)">${fmtSec(Math.floor((Date.now()-w.start)/1000))}</div><div style="font-size:11px;font-weight:700;color:var(--ex)">Resume ›</div></div></div></div>`;
   }else{
-    h+=`<button class="plan-btn pri" style="width:100%;margin-top:8px;padding:14px;font-size:16px;background:var(--ex);border-color:var(--ex);color:#001a19" onclick="wkStart([])">▶ Start workout</button>
-    <div style="display:flex;gap:8px;margin-top:8px"><button class="plan-btn" onclick="showRoutines()">📋 Routines</button><button class="plan-btn" onclick="showPicker('browse')">📚 Exercises</button></div>`;
-    const rs=(S.routines||[]).filter(r=>!r.deleted).slice(0,6);
+    h+=todayCard()+`<button class="plan-btn" style="width:100%;margin-top:8px;padding:11px" onclick="wkStart([])">＋ Empty workout</button>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="plan-btn" onclick="showRoutines()">📋 Routines</button><button class="plan-btn" onclick="showWeekPlan()">🗓 Week plan</button><button class="plan-btn" onclick="showPicker('browse')">📚 Exercises</button></div>`;
+    const rs=sortedRoutines().slice(0,6);
     if(rs.length)h+=`<div style="margin-top:8px">${rs.map(r=>`<button class="plan-chip" onclick="startRoutine('${r.id}')">▶ ${escapeHtml(r.name)}</button>`).join('')}</div>`;
     const rec=pkRecent().slice(0,6);
     if(rec.length)h+=`<div style="font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--muted);margin:8px 0 4px">QUICK START</div><div>${rec.map(id=>`<button class="plan-chip" onclick="wkStart(['${id}'])">${escapeHtml(exById(id).name)}</button>`).join('')}</div>`;
   }
-  const tw=liveW().filter(x=>x.date===today&&x.end).sort((a,b)=>a.start-b.start);
+  h+=weekStrip()+snackCard();
+  const tw=liveW().filter(x=>!x.snack&&x.date===today&&x.end).sort((a,b)=>a.start-b.start);
   if(tw.length){
     h+=`<div style="font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--muted);margin:10px 0 2px">TODAY</div>`+tw.map(x=>(x.exercises||[]).map(en=>{
       const lib=exById(en.exId)||{name:'?',kind:'wr'};
@@ -4114,7 +4292,7 @@ function renderWkMuscle(){
   const prevKey=(()=>{const[y,m,d]=cur.split('-').map(Number);return new Date(Date.UTC(y,m-1,d-7)).toISOString().slice(0,10);})();
   const tally={cur:{},prev:{}};
   liveW().forEach(w=>{
-    const wk=weekKey(w.date),which=wk===cur?'cur':wk===prevKey?'prev':null;if(!which)return;
+    if(w.snack)return;const wk=weekKey(w.date),which=wk===cur?'cur':wk===prevKey?'prev':null;if(!which)return;
     (w.exercises||[]).forEach(en=>{const lib=exById(en.exId);if(!lib)return;const n=en.sets.filter(s=>s.done&&s.type!=='W').length;if(n)tally[which][lib.muscle]=(tally[which][lib.muscle]||0)+n;});
   });
   const ms=MUSCLES.filter(m=>tally.cur[m]||tally.prev[m]).sort((a,b)=>(tally.cur[b]||0)-(tally.cur[a]||0));

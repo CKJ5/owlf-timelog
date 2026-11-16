@@ -4972,7 +4972,7 @@ function updateLifeUI(){
 function updateExUI(){
   if(typeof seedExLib==='function')seedExLib();
   calcExStreak();
-  const d=getToday();refreshExHit(tk());
+  const d=getToday();refreshExHit(tk());const total=d.exTotal||0;
   {const g=exGoalInfo(tk());
    document.getElementById('ex-times-today').textContent=g.big1;
    const t2=document.getElementById('ex-target-num');t2.textContent=g.big2;t2.style.fontSize=g.planned?'20px':'38px';

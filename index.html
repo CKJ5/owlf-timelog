@@ -409,14 +409,17 @@ async function restoreFromFirestore(){
     // Restore all days
     const days=await db.collection(`users/${_uid}/days`).get();
     if(!S.daily)S.daily={};
-    const _today=tk(),_yday=yd();
+    const _today=tk(),_yday=yd(),_edBefore={};
     days.forEach(doc=>{
       const k=doc.id;
       if(!S.daily)S.daily={};   // ← ADD THIS
       const remote=doc.data();
       delete remote._ts;
+      _edBefore[k]=(S.daily[k]&&S.daily[k]._ed)||0;
       if(!S.daily[k]){
         S.daily[k]=remote;
+      } else if(remote._ed&&remote._ed>_edBefore[k]){
+        Object.assign(S.daily[k],remote);   // edited in the time-log editor on another device: newer edit wins
       } else if(k===_today||k===_yday){
         // Today/yesterday can have local edits that haven't reached Firestore yet
         // (offline session, or a refresh that outran the 3s debounced sync). A
@@ -436,7 +439,8 @@ async function restoreFromFirestore(){
     const sess=await db.collection(`users/${_uid}/sessions`).get();
     sess.forEach(doc=>{
       const k=doc.id;
-      if(!S.sessions[k]&&doc.data().list)S.sessions[k]=doc.data().list;
+      const sd=doc.data();
+      if(sd.list&&(!S.sessions[k]||(sd._ed&&sd._ed>(_edBefore[k]||0))))S.sessions[k]=sd.list;
     });
     // Recalculate sleepHours for any day that has wakeTime but missing sleepHours
     Object.keys(S.daily).forEach(k=>{
@@ -1939,7 +1943,8 @@ function loadTZSetting(){
 const tk=()=>myDate().toISOString().slice(0,10);
 const mk=()=>myDate().toISOString().slice(0,7);
 const yk=()=>myDate().toISOString().slice(0,4);
-const nowTs=()=>Date.now();
+let _nowOv=null;   // lets the time-log editor stop a forgotten timer at a past time
+const nowTs=()=>_nowOv!=null?_nowOv:Date.now();
 const elMin=t=>(nowTs()-t)/60000;
 const elSec=t=>Math.floor((nowTs()-t)/1000);
 function fmtSec(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;return h>0?h+':'+pad(m)+':'+pad(ss):m+':'+pad(ss);}
@@ -2523,7 +2528,7 @@ function stopWork(type,startTs){
   if(!S.sessions[tk()])S.sessions[tk()]=[];
   const ptype=S.active['w_'+type]?.ptype||'';
   const _pid=S.active['w_'+type]?.planId||null;
-  S.sessions[tk()].push({type,proj,ptype,dur:net,wasted:wst,ts:new Date().toISOString(),...(_pid?{planId:_pid}:{})});
+  S.sessions[tk()].push({type,proj,ptype,dur:net,wasted:wst,ts:new Date(nowTs()).toISOString(),...(_pid?{planId:_pid}:{})});
   if(_pid)finishPlanBlock(_pid,actualStart,wst,_pausedMin);
   delete S.active['w_'+type];
   console.log('stopping, active after delete:', JSON.stringify(S.active)); // ← ADD
@@ -7471,6 +7476,307 @@ setInterval(()=>{
   
 </script>
 
+
+<script id="timelog-editor">
+// ═══ TIME LOG EDITOR — fix any recorded time after the fact (forgot to press start / stop) ═══
+var _tl={date:null,edit:null,run:[]};
+const _tlOff=()=>getTZOffset()*3600000;
+const tlMsToInput=ms=>new Date(ms+_tlOff()).toISOString().slice(0,16);
+const tlInputToMs=v=>v?Date.parse((v.length===16?v+':00':v)+'Z')-_tlOff():NaN;
+const tlDayOf=ms=>new Date(ms+_tlOff()).toISOString().slice(0,10);
+const tlDateMs=(k,hm)=>{const[y,m,d]=k.split('-').map(Number);const p=parseHM(hm||'12:00');return Date.UTC(y,m-1,d,p.h,p.m)-_tlOff();};
+const tlHM=ms=>new Date(ms+_tlOff()).toISOString().slice(11,16);
+const tlDur=m=>{m=Math.max(0,Math.round(m));const h=Math.floor(m/60);return h?h+'h'+(m%60?' '+(m%60)+'m':''):m+'m';};
+const TL_ENT_ICONS={play:'🎮',show:'📺',outdoor:'🌿',clean:'🧹',laydown:'🛋️',date:'💕'};
+const TL_CARDIO_ICONS={jogging:'🏃',cycling:'🚴',hiit:'⚡'};
+
+function tlCats(){
+  const c=[
+    {id:'work',icon:'💼',label:'Work',kind:'work'},
+    {id:'nap',icon:'😴',label:'Nap',kind:'nap'},
+    {id:'snake',icon:'🐍',label:'Snake',kind:'log',tot:'snakeDur',cnt:'snakeSessions',log:'snakeLog',active:'snake'},
+    {id:'fire',icon:'🔥',label:'Fire',kind:'log',tot:'fireDur',cnt:'fireCount',log:'fireLog',active:'fire'}
+  ];
+  ENT_TYPES.forEach(t=>{const cap=entCap(t);c.push({id:'ent_'+t,icon:TL_ENT_ICONS[t]||'🎬',label:cap,kind:'log',tot:'ent'+cap,cnt:'ent'+cap+'Sessions',log:'ent'+cap+'Log',active:'ent_'+t});});
+  PREP_TYPES.forEach(t=>{const cap=entCap(t);c.push({id:'prep_'+t,icon:PREP_ICONS[t],label:PREP_LABELS[t],kind:'log',tot:'prep'+cap,cnt:null,log:'prep'+cap+'Log',active:'prep_'+t});});
+  CARDIO_TYPES.forEach(t=>c.push({id:'cardio_'+t,icon:TL_CARDIO_ICONS[t]||'🏃',label:'Cardio · '+t,kind:'log',tot:'cardio_'+t,cnt:null,log:'cardio_'+t+'Log',active:'cardio_'+t}));
+  return c;
+}
+const tlCat=id=>tlCats().find(c=>c.id===id);
+
+// ---- rows for one day ----
+function tlRows(k){
+  const d=S.daily[k]||{},rows=[];
+  (S.sessions&&S.sessions[k]||[]).forEach((s,i)=>{
+    const e=Date.parse(s.ts);if(isNaN(e))return;
+    const tot=(s.dur||0)+(s.wasted||0);
+    rows.push({cat:'work',i,s:e-tot*60000,e,icon:'💼',label:(s.type||'work')+(s.proj?' · '+s.proj:''),sub:s.wasted?('wasted '+s.wasted+'m'):''});
+  });
+  tlCats().forEach(c=>{
+    if(c.kind==='log')(d[c.log]||[]).forEach((en,i)=>{if(!en||!en.end)return;rows.push({cat:c.id,i,s:en.end-(en.dur||0)*60000,e:en.end,icon:c.icon,label:c.label+(en.note?' · '+en.note:en.mode?' · '+en.mode:''),sub:''});});
+  });
+  (d.napLog||[]).forEach((n,i)=>{const s=tlDateMs(k,n.start);rows.push({cat:'nap',i,s,e:s+(n.dur||0)*60000,icon:'😴',label:'Nap',sub:''});});
+  rows.sort((a,b)=>a.s-b.s);
+  return rows;
+}
+
+// ---- mutations ----
+function tlAdd(catId,k,s,e,x){
+  x=x||{};const d=ensureDay(k);const dur=Math.round((e-s)/60000);
+  if(catId==='work'){
+    const type=x.type||'design',w=Math.max(0,x.wasted||0),net=Math.max(0,dur-w);
+    d[type]=(d[type]||0)+net;if(!d.wasted)d.wasted={design:0,games:0,clients:0};d.wasted[type]=(d.wasted[type]||0)+w;
+    if(!S.sessions)S.sessions={};if(!S.sessions[k])S.sessions[k]=[];
+    S.sessions[k].push({type,proj:x.proj||'',ptype:x.ptype||'',dur:net,wasted:w,ts:new Date(e).toISOString(),...(x.planId?{planId:x.planId}:{})});
+    S.sessions[k].sort((a,b)=>Date.parse(a.ts)-Date.parse(b.ts));
+  }else if(catId==='nap'){
+    const sm=tsToMytMin(s);
+    if(!d.napLog)d.napLog=[];
+    d.napLog.push({start:tlHM(s),end:tlHM(e),dur,startMin:sm,endMin:sm+dur,ts:e});
+    d.napCount=(d.napCount||0)+1;d.napDur=(d.napDur||0)+dur;
+    d.sleepHours=Math.round(((d.sleepHours||0)+dur/60)*10)/10;
+  }else{
+    const c=tlCat(catId);
+    d[c.tot]=(d[c.tot]||0)+dur;if(c.cnt)d[c.cnt]=(d[c.cnt]||0)+1;
+    if(!d[c.log])d[c.log]=[];d[c.log].push({dur,end:e});d[c.log].sort((a,b)=>a.end-b.end);
+  }
+}
+function tlRemove(catId,k,i){
+  const d=ensureDay(k);
+  if(catId==='work'){
+    const s=(S.sessions[k]||[])[i];if(!s)return;
+    d[s.type]=Math.max(0,(d[s.type]||0)-(s.dur||0));
+    if(d.wasted)d.wasted[s.type]=Math.max(0,(d.wasted[s.type]||0)-(s.wasted||0));
+    S.sessions[k].splice(i,1);
+  }else if(catId==='nap'){
+    const n=(d.napLog||[])[i];if(!n)return;
+    d.napLog.splice(i,1);d.napCount=Math.max(0,(d.napCount||0)-1);d.napDur=Math.max(0,(d.napDur||0)-(n.dur||0));
+    if(d.sleepHours!=null)d.sleepHours=Math.max(0,Math.round((d.sleepHours-(n.dur||0)/60)*10)/10);
+  }else{
+    const c=tlCat(catId),en=(d[c.log]||[])[i];if(!en)return;
+    d[c.tot]=Math.max(0,(d[c.tot]||0)-(en.dur||0));if(c.cnt)d[c.cnt]=Math.max(0,(d[c.cnt]||0)-1);
+    d[c.log].splice(i,1);
+  }
+}
+// Edit in place so extra fields (plan link, notes, kcal…) survive.
+function tlEditRow(catId,k,i,s,e,x){
+  x=x||{};const d=ensureDay(k);const dur=Math.round((e-s)/60000);
+  if(catId==='work'){
+    const en=S.sessions[k][i];if(!en)return;
+    const type=x.type||en.type,w=Math.max(0,x.wasted||0),net=Math.max(0,dur-w);
+    d[en.type]=Math.max(0,(d[en.type]||0)-(en.dur||0));
+    if(!d.wasted)d.wasted={design:0,games:0,clients:0};
+    d.wasted[en.type]=Math.max(0,(d.wasted[en.type]||0)-(en.wasted||0));
+    d[type]=(d[type]||0)+net;d.wasted[type]=(d.wasted[type]||0)+w;
+    en.type=type;en.dur=net;en.wasted=w;en.ts=new Date(e).toISOString();
+    if(x.proj!==undefined)en.proj=x.proj;if(x.ptype!==undefined)en.ptype=x.ptype;
+    S.sessions[k].sort((a,b)=>Date.parse(a.ts)-Date.parse(b.ts));
+    if(en.planId){
+      const b=liveItems(S.plan).find(p=>p.id===en.planId);
+      if(b){b.aStart=tlHM(s);b.aEnd=tlHM(e);b.wasted=w;b.aMin=actMinOf(b);touchP(b);plannerChanged();}
+    }
+  }else if(catId==='nap'){
+    const n=d.napLog[i];if(!n)return;const delta=dur-(n.dur||0),sm=tsToMytMin(s);
+    n.start=tlHM(s);n.end=tlHM(e);n.dur=dur;n.startMin=sm;n.endMin=sm+dur;
+    d.napDur=Math.max(0,(d.napDur||0)+delta);
+    d.sleepHours=Math.max(0,Math.round(((d.sleepHours||0)+delta/60)*10)/10);
+  }else{
+    const c=tlCat(catId),en=d[c.log][i];if(!en)return;
+    d[c.tot]=Math.max(0,(d[c.tot]||0)+dur-(en.dur||0));en.dur=dur;en.end=e;
+    d[c.log].sort((a,b)=>a.end-b.end);
+  }
+}
+function tlRecalcSleep(k){
+  const d=S.daily[k];if(!d)return;
+  const prev=S.daily[addToDate(k,-1,'day')];
+  let base=null;
+  if(d.wakeTime&&prev&&prev.sleepTime){
+    const a=parseHM(prev.sleepTime),b=parseHM(d.wakeTime);
+    let sm=toMin(a.h,a.m),wm=toMin(b.h,b.m);if(wm<=sm)wm+=1440;
+    const h=(wm-sm)/60;if(h>0&&h<20)base=h;
+  }
+  const nap=(d.napDur||0)/60;
+  d.sleepHours=base==null?(nap?Math.round(nap*10)/10:null):Math.round((base+nap)*10)/10;
+}
+
+// ---- after any change ----
+function tlAfter(keys){
+  keys=[...new Set(keys)];
+  keys.forEach(k=>{if(S.daily[k])S.daily[k]._ed=Date.now();});
+  try{calcWorkStreak();}catch(e){}
+  try{calcSleepStreak();}catch(e){}
+  try{calcExStreak();}catch(e){}
+  save();
+  try{updateWorkUI();updateLifeUI();updateExUI();}catch(e){}
+  try{renderReport();}catch(e){}
+  tlPush(keys);
+}
+async function tlPush(keys){
+  if(typeof _uid==='undefined'||!_uid||!db)return;
+  try{
+    const b=db.batch();
+    keys.forEach(k=>{
+      const d=S.daily[k];if(!d)return;
+      b.set(db.doc(`users/${_uid}/days/${k}`),{...d,_ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      b.set(db.doc(`users/${_uid}/sessions/${k}`),{list:(S.sessions&&S.sessions[k])||[],_ed:d._ed},{merge:true});
+    });
+    await b.commit();
+  }catch(e){console.warn('Time-log push failed:',e);}
+}
+
+// ---- UI ----
+const _tlIn='width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:14px;margin-bottom:8px';
+function openTimeLog(date){
+  _tl.date=date||_tl.date||tk();_tl.edit=null;tlRender();
+}
+function tlRender(){
+  const k=_tl.date,rows=tlRows(k),d=S.daily[k]||{};
+  const nav=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><button class="bcanc" style="flex:0 0 40px;padding:8px" onclick="tlGo(-1)">‹</button><input type="date" id="tl-date" value="${k}" onchange="tlPick(this.value)" style="${_tlIn};margin:0;flex:1;text-align:center"><button class="bcanc" style="flex:0 0 40px;padding:8px" onclick="tlGo(1)">›</button></div>`;
+  let h=`<h3 style="color:var(--work);margin-bottom:8px">🕘 Time log</h3>${nav}<div style="max-height:68vh;overflow-y:auto;padding-right:2px">`;
+  // running now
+  _tl.run=Object.keys(S.active||{}).filter(key=>S.active[key]&&typeof S.active[key].start==='number'&&tlRunInfo(key));
+  if(_tl.run.length){
+    h+=`<label class="mlbl">Running now</label>`;
+    _tl.run.forEach((key,ix)=>{
+      const a=S.active[key],inf=tlRunInfo(key),st=a.origStart||a.start;
+      h+=`<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;background:var(--bg2)"><div style="font-weight:700;margin-bottom:6px">${inf.icon} ${escapeHtml(inf.label)}${a.pausedAt?' <span style="color:var(--muted);font-weight:500">(paused)</span>':''}</div>
+      <label class="mlbl">Started</label><input type="datetime-local" id="tl-rs-${ix}" value="${tlMsToInput(st)}" style="${_tlIn}">
+      <button class="bconf" style="width:100%;margin-bottom:8px;padding:9px;font-size:14px" onclick="tlSetStart(${ix})">Save start time</button>
+      ${a.pausedAt?'<div style="font-size:12px;color:var(--muted)">Resume it first to stop at a past time.</div>':`<label class="mlbl">Actually stopped at</label><input type="datetime-local" id="tl-re-${ix}" value="${tlMsToInput(Date.now())}" style="${_tlIn}">${inf.work?`<label class="mlbl">Wasted min</label><input type="number" id="tl-rw-${ix}" value="0" min="0" style="${_tlIn}">`:''}<div style="display:flex;gap:8px"><button class="bconf" style="padding:9px;font-size:14px" onclick="tlStopAt(${ix})">⏹ Stop at that time</button><button class="bcanc" style="padding:9px;font-size:14px" onclick="tlDiscard(${ix})">Discard</button></div>`}</div>`;
+    });
+  }
+  // sleep / wake
+  h+=`<label class="mlbl">Sleep / wake</label><div style="display:flex;gap:8px;margin-bottom:4px"><div style="flex:1"><div style="font-size:11px;color:var(--muted)">🌙 Went to bed</div><input type="time" id="tl-sl" value="${d.sleepTime||''}" style="${_tlIn}"></div><div style="flex:1"><div style="font-size:11px;color:var(--muted)">☀️ Woke up</div><input type="time" id="tl-wk" value="${d.wakeTime||''}" style="${_tlIn}"></div></div><button class="bcanc" style="width:100%;padding:8px;margin-bottom:10px" onclick="tlSaveSleep()">Save sleep/wake${d.sleepHours?' · slept '+d.sleepHours+'h':''}</button>`;
+  // entries
+  h+=`<label class="mlbl">Entries · ${k}</label>`;
+  if(!rows.length)h+=`<div style="color:var(--muted);font-size:13px;margin-bottom:8px">Nothing recorded this day.</div>`;
+  rows.forEach((r,ri)=>{
+    h+=`<div onclick="tlEdit(${ri})" style="display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;background:var(--bg2);cursor:pointer"><span style="font-size:18px">${r.icon}</span><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.label)}</div><div style="font-size:12px;color:var(--muted)">${tlHM(r.s)} – ${tlHM(r.e)} · ${tlDur((r.e-r.s)/60000)}${r.sub?' · '+r.sub:''}</div></div><span style="color:var(--muted)">✎</span></div>`;
+  });
+  h+=`<button class="bcanc" style="width:100%;padding:10px;margin-top:2px" onclick="tlEdit(-1)">＋ Add a missed entry</button></div>`;
+  h+=`<div class="mbtns" style="margin-top:10px"><button class="bcanc" onclick="closeModal()">Close</button></div>`;
+  showModal(h,null);
+  window._tlRows=rows;
+}
+function tlRunInfo(key){
+  if(key.startsWith('w_')){const t=key.slice(2);return WTYPES.includes(t)?{icon:'💼',label:'Work · '+t+(S.active[key].proj?' · '+S.active[key].proj:''),work:true}:null;}
+  if(key.startsWith('wp_')){const a=S.active[key];return{icon:'💼',label:'Work · '+(a.type||'')+(a.proj?' · '+a.proj:''),work:true};}
+  const c=tlCats().find(x=>x.active===key);return c?{icon:c.icon,label:c.label}:null;
+}
+function tlGo(n){_tl.date=addToDate(_tl.date,n,'day');tlRender();}
+function tlPick(v){if(v){_tl.date=v;tlRender();}}
+
+function tlEdit(ri){
+  const k=_tl.date,row=ri>=0?window._tlRows[ri]:null;
+  const isAdd=!row;
+  let s,e,cat,x={};
+  if(row){s=row.s;e=row.e;cat=row.cat;if(cat==='work')x=S.sessions[k][row.i];}
+  else{const now=Date.now();const same=tlDayOf(now)===k;e=same?now:tlDateMs(k,'10:00');s=e-3600000;cat='work';}
+  _tl.edit={ri,cat,isAdd};
+  const opts=tlCats().map(c=>`<option value="${c.id}"${c.id===cat?' selected':''}>${c.icon} ${escapeHtml(c.label)}</option>`).join('');
+  const workF=`<div id="tl-wf" style="${cat==='work'?'':'display:none'}"><label class="mlbl">Type</label><select id="tl-wt" style="${_tlIn}">${WTYPES.map(t=>`<option${t===(x.type||'design')?' selected':''}>${t}</option>`).join('')}</select><label class="mlbl">Project</label><input type="text" id="tl-wp" value="${escapeHtml(x.proj||'')}" style="${_tlIn}"><label class="mlbl">Wasted min (not counted)</label><input type="number" id="tl-ww" min="0" value="${x.wasted||0}" style="${_tlIn}"></div>`;
+  showModal(`<h3 style="color:var(--work);margin-bottom:8px">${isAdd?'＋ Add entry':'✎ Edit entry'} · ${k}</h3>
+  <label class="mlbl">Category</label><select id="tl-cat" ${isAdd?'':'disabled'} onchange="document.getElementById('tl-wf').style.display=this.value==='work'?'':'none'" style="${_tlIn}">${opts}</select>
+  <label class="mlbl">Start</label><input type="datetime-local" id="tl-s" value="${tlMsToInput(s)}" style="${_tlIn}">
+  <label class="mlbl">End</label><input type="datetime-local" id="tl-e" value="${tlMsToInput(e)}" style="${_tlIn}">
+  ${workF}
+  <div class="mbtns" style="margin-top:8px"><button class="bcanc" onclick="tlRender()">Back</button>${isAdd?'':'<button class="bcanc" style="color:#e66" onclick="tlDelete()">Delete</button>'}<button class="bconf" onclick="tlSave()">Save</button></div>`,null);
+}
+function tlReadForm(){
+  const s=tlInputToMs(document.getElementById('tl-s').value),e=tlInputToMs(document.getElementById('tl-e').value);
+  if(isNaN(s)||isNaN(e)||e<=s){alert('End must be after start.');return null;}
+  const x={};
+  if(document.getElementById('tl-wf')&&document.getElementById('tl-wf').style.display!=='none'){
+    x.type=document.getElementById('tl-wt').value;x.proj=document.getElementById('tl-wp').value.trim();
+    x.wasted=Math.max(0,parseFloat(document.getElementById('tl-ww').value)||0);
+  }
+  return{s,e,x};
+}
+function tlSave(){
+  const f=tlReadForm();if(!f)return;
+  const k=_tl.date,ed=_tl.edit,keys=[k];
+  if(ed.isAdd){
+    const cat=document.getElementById('tl-cat').value;
+    const dk=tlDayOf(f.e);   // an entry that ends after midnight belongs to the day it ended
+    keys.push(dk);
+    tlAdd(cat,dk,f.s,f.e,f.x);
+    if(dk!==k)_tl.date=dk;
+  }else{
+    const row=window._tlRows[ed.ri];
+    tlEditRow(row.cat,k,row.i,f.s,f.e,row.cat==='work'?f.x:{});
+  }
+  tlAfter(keys);tlRender();
+}
+function tlDelete(){
+  const ed=_tl.edit,row=window._tlRows[ed.ri];
+  if(!confirm('Delete this entry? Totals for the day will be reduced.'))return;
+  tlRemove(row.cat,_tl.date,row.i);
+  tlAfter([_tl.date]);tlRender();
+}
+function tlSaveSleep(){
+  const k=_tl.date,d=ensureDay(k);
+  d.sleepTime=document.getElementById('tl-sl').value||null;
+  d.wakeTime=document.getElementById('tl-wk').value||null;
+  tlRecalcSleep(k);
+  const nk=addToDate(k,1,'day');
+  if(S.daily[nk])tlRecalcSleep(nk);
+  tlAfter([k,...(S.daily[nk]?[nk]:[])]);tlRender();
+}
+// ---- running timers ----
+function tlSetStart(ix){
+  const key=_tl.run[ix],a=S.active[key];if(!a)return;
+  const ms=tlInputToMs(document.getElementById('tl-rs-'+ix).value);
+  if(isNaN(ms)||ms>Date.now()+60000){alert('Start must be in the past.');return;}
+  const delta=ms-(a.origStart||a.start);
+  a.start+=delta;if(a.origStart)a.origStart+=delta;
+  save();try{updateWorkUI();updateLifeUI();updateExUI();}catch(e){}
+  syncActiveToFirestore();tlRender();
+}
+function tlDiscard(ix){
+  const key=_tl.run[ix];if(!key||!confirm('Discard this running timer without recording anything?'))return;
+  delete S.active[key];save();
+  try{updateWorkUI();updateLifeUI();updateExUI();}catch(e){}
+  syncActiveToFirestore();tlRender();
+}
+function tlStopAt(ix){
+  const key=_tl.run[ix],a=S.active[key];if(!a)return;
+  const e=tlInputToMs(document.getElementById('tl-re-'+ix).value),s=a.origStart||a.start;
+  if(isNaN(e)||e<=s||e>Date.now()+60000){alert('Stop time must be after the start and not in the future.');return;}
+  const dk=tlDayOf(e),inf=tlRunInfo(key),keys=[dk];
+  if(inf.work){
+    const type=key.startsWith('w_')?key.slice(2):(a.type||'design');
+    const w=Math.max(0,parseFloat(document.getElementById('tl-rw-'+ix)?.value)||0);
+    tlAdd('work',dk,s,e,{type,wasted:w,proj:a.proj||'',ptype:a.ptype||'',planId:a.planId});
+    if(a.planId){_nowOv=e;try{finishPlanBlock(a.planId,s,w,(a.pausedMs||0)/60000);}finally{_nowOv=null;}}
+    if(window._swReg?.active)window._swReg.active.postMessage({type:'CLEAR',tag:'owlf-work'});
+  }else{
+    const c=tlCats().find(x=>x.active===key);
+    if(Math.round((e-s)/60000)>=1)tlAdd(c.id,dk,s,e);
+  }
+  delete S.active[key];
+  syncActiveToFirestore();
+  _tl.date=dk;tlAfter(keys);tlRender();
+}
+// entry points
+(function(){
+  ['page-work','page-life','page-exercise'].forEach(id=>{
+    const l=document.querySelector('#'+id+' .page-hdr-left');if(!l)return;
+    const b=document.createElement('button');
+    b.className='tl-open';b.title='Edit recorded times';b.textContent='🕘';
+    b.style.cssText='position:absolute;right:0;top:0;background:none;border:none;font-size:18px;cursor:pointer;opacity:.75;padding:4px';
+    l.style.position='relative';l.appendChild(b);
+    b.onclick=ev=>{ev.stopPropagation();openTimeLog(tk());};
+  });
+  const cal=document.getElementById('report-calendar');
+  if(cal&&cal.parentNode){
+    const b=document.createElement('button');
+    b.textContent='🕘 Edit recorded times';
+    b.style.cssText="width:100%;padding:12px 16px;border-radius:12px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px";
+    b.onclick=()=>openTimeLog(tk());
+    cal.parentNode.insertBefore(b,cal);
+  }
+})();
+</script>
 
 </body>
 </html>

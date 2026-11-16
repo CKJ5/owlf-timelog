@@ -144,7 +144,7 @@ async function syncToFirestore(){
     const yesterday=yd();
     const dayData=S.daily[today]||{};
     
-    const meta={workStreak:S.work.streak||0,sleepStreak:S.life.sleepStreak||0,exStreak:S.exercise.streak||0,workMin:S.workMin||180,sleepTarget:S.sleepTarget||7,exTarget:S.exTarget||100,medalTarget:S.medalTarget||25,projectTypes:S.projectTypes||[],uiStyle:S.uiStyle||'owlf',weekStart:S.weekStart||0,ratioSelections:S.ratioSelections||{},recentSessions:S.recentSessions||[],aiTasks:S.aiTasks||[]};
+    const meta={workStreak:S.work.streak||0,sleepStreak:S.life.sleepStreak||0,exStreak:S.exercise.streak||0,workMin:S.workMin||180,sleepTarget:S.sleepTarget||7,exTarget:S.exTarget||100,medalTarget:S.medalTarget||25,projectTypes:S.projectTypes||[],uiStyle:S.uiStyle||'owlf',weekStart:S.weekStart||0,ratioSelections:S.ratioSelections||{},recentSessions:S.recentSessions||[],aiTasks:S.aiTasks||[],urgentAfter:S.urgentAfter||'10:00'};
     const batch=db.batch();
     batch.set(db.doc(`users/${_uid}/days/${today}`),{...dayData,_ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
     // Also sync yesterday in case heavy/sleep sessions crossed midnight
@@ -404,6 +404,7 @@ async function restoreFromFirestore(){
       if(m.ratioSelections)S.ratioSelections=m.ratioSelections;
       if(m.recentSessions)S.recentSessions=m.recentSessions;
       if(m.aiTasks)S.aiTasks=m.aiTasks;
+      if(m.urgentAfter)S.urgentAfter=m.urgentAfter;
     }
     // Restore all days
     const days=await db.collection(`users/${_uid}/days`).get();
@@ -1126,6 +1127,10 @@ function installPWA(){
           <div style="font-size:11px;color:var(--muted);margin-top:4px" id="work-target-note">Sets target for this month onwards</div>
         </div>
         <div style="margin-bottom:12px">
+          <div class="mlbl" style="margin-bottom:6px">⚡ Plan locks at (blocks added after this today = urgent)</div>
+          <input type="time" id="urgent-after-inp" value="10:00" onchange="S.urgentAfter=this.value||'10:00';save();if(typeof syncToFirestore==='function')syncToFirestore();renderPlanCard(true)" style="width:100%;background:var(--bg3);border:1px solid var(--work);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:15px">
+        </div>
+        <div style="margin-bottom:12px">
           <div class="mlbl" style="margin-bottom:6px">Sleep Target (hours/night)</div>
           <div style="display:flex;gap:8px;align-items:baseline">
             <input type="number" id="sleep-target-inp" value="7" min="4" max="12" step="0.5" style="flex:1;background:var(--bg3);border:1px solid var(--life);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:15px">
@@ -1241,6 +1246,12 @@ function installPWA(){
         <div id="native-settings" style="display:none">
           <div class="set-sub">📱 Android app <span class="tag">v__APP_VERSION__</span></div>
           <div id="native-settings-body"></div>
+        </div>
+        <div class="set-sub">🔄 App updates</div>
+        <div id="upd-status" style="font-size:12px;color:var(--muted);margin-bottom:8px">Checks automatically on open and every 30 min.</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button onclick="_updDismissed=false;checkForUpdate(true)" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--work);background:var(--bg3);color:var(--work);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Check now</button>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted)">Auto-apply <input type="checkbox" id="upd-auto" onchange="updSetAuto(this.checked)" style="width:18px;height:18px;accent-color:var(--work)"></label>
         </div>
       </div>
     </div>
@@ -1445,6 +1456,7 @@ function installPWA(){
   <div id="plan-body"></div>
   <div style="display:flex;gap:8px;margin-top:12px">
     <button class="plan-btn pri" onclick="showPlanModal()">＋ Add block</button>
+    <button class="plan-btn" style="color:#e0a030;border-color:#e0a030;flex:0 0 auto" onclick="showUrgentModal()">⚡ Urgent</button>
     <button class="plan-btn" onclick="showProjectsModal()">📁 Projects</button>
     <button class="plan-btn" onclick="showCalModal()">📅</button>
   </div>
@@ -2166,6 +2178,8 @@ function showSettings(){
   updateNotifBtnUI();
   document.getElementById('sleep-target-inp').value=S.sleepTarget||7;
   document.getElementById('work-target-inp').value=S.workMin||180;
+  {const _ua=document.getElementById('upd-auto');if(_ua)_ua.checked=updAutoOn();}
+  if(document.getElementById('urgent-after-inp'))document.getElementById('urgent-after-inp').value=S.urgentAfter||'10:00';
   document.getElementById('ex-target-settings-inp').value=S.exTarget||100;
   if(document.getElementById('medal-target-inp'))document.getElementById('medal-target-inp').value=S.medalTarget||25;
   updateSettingsWeekStart();
@@ -2501,7 +2515,7 @@ function startWork(type){
 function stopWork(type,startTs){
   if(!S.active['w_'+type]){closeModal();return;}
   console.log('stopping, active before:', JSON.stringify(S.active)); // ← ADD
-  const actualStart=S.active['w_'+type].start||startTs;
+  const _a0=S.active['w_'+type];const actualStart=_a0.origStart||_a0.start||startTs;const _pausedMin=(_a0.pausedMs||0)/60000;
   const el=elMin(actualStart),wst=parseFloat(document.getElementById('w-wst')?.value)||0,net=Math.max(0,el-wst);
   const d=getToday();d[type]=(d[type]||0)+net;if(!d.wasted)d.wasted={design:0,games:0,clients:0};d.wasted[type]=(d.wasted[type]||0)+wst;
   const proj=S.active['w_'+type]?.proj||'';
@@ -2510,13 +2524,14 @@ function stopWork(type,startTs){
   const ptype=S.active['w_'+type]?.ptype||'';
   const _pid=S.active['w_'+type]?.planId||null;
   S.sessions[tk()].push({type,proj,ptype,dur:net,wasted:wst,ts:new Date().toISOString(),...(_pid?{planId:_pid}:{})});
-  if(_pid)finishPlanBlock(_pid,actualStart,wst);
+  if(_pid)finishPlanBlock(_pid,actualStart,wst,_pausedMin);
   delete S.active['w_'+type];
   console.log('stopping, active after delete:', JSON.stringify(S.active)); // ← ADD
   if(window._swReg?.active)window._swReg.active.postMessage({type:'CLEAR',tag:'owlf-work'});
   save();closeModal();calcWorkStreak();updateWorkUI();
   syncActiveToFirestore();
   console.log('syncActiveToFirestore called'); // ← ADD
+  if(_pid)setTimeout(offerResume,80);
 }
   
 function calcWorkStreak(){
@@ -2557,7 +2572,7 @@ function actMinOf(b){
   const s=hm2min(b.aStart),e=hm2min(b.aEnd);
   if(s===null||e===null)return null;
   let d=e-s;if(d<0)d+=1440;
-  return Math.max(0,d-(b.wasted||0));
+  return Math.max(0,d-(b.wasted||0)-(b.paused||0));
 }
 function blockDev(b){if(b.aMin==null||!b.pMin)return null;return(b.aMin-b.pMin)/b.pMin*100;}
 function devColor(p){if(p==null)return'var(--muted)';const a=Math.abs(p);if(a<=10)return'#3fa66b';if(p>0)return a<=30?'#e0a030':'#e0524d';return'#4f8fc0';}
@@ -2571,7 +2586,7 @@ function projActualMin(p){
 }
 function typeStats(){
   const m={};
-  liveItems(S.plan).filter(b=>b.aMin!=null&&b.pMin>0).forEach(b=>{const k=b.ptype||'';const o=m[k]||(m[k]={n:0,p:0,a:0});o.n++;o.p+=b.pMin;o.a+=b.aMin;});
+  liveItems(S.plan).filter(b=>b.aMin!=null&&b.pMin>0&&!b.urgent).forEach(b=>{const k=b.ptype||'';const o=m[k]||(m[k]={n:0,p:0,a:0});o.n++;o.p+=b.pMin;o.a+=b.aMin;});
   return m;
 }
 function estBar(act,est){
@@ -2602,7 +2617,7 @@ function planTimeline(blocks,date){
   blocks.forEach(b=>{
     const ps=hm2min(b.pStart)||0,pe=ps+b.pMin;let as=null,ae=null;
     if(b.aStart&&b.aEnd){as=hm2min(b.aStart);ae=hm2min(b.aEnd);if(ae<=as)ae+=1440;}
-    else{const r=runAct.find(a=>a.planId===b.id);if(r&&nowMin!=null){as=tsToMytMin(r.start);ae=Math.max(as+1,nowMin);}}
+    else{const r=runAct.find(a=>a.planId===b.id);if(r&&nowMin!=null){as=tsToMytMin(r.origStart||r.start);ae=Math.max(as+1,r.pausedAt?tsToMytMin(r.pausedAt):nowMin);}}
     lo=Math.min(lo,ps,as==null?ps:as);hi=Math.max(hi,pe,ae==null?pe:ae);
     segs.push({b,ps,pe,as,ae});
   });
@@ -2623,7 +2638,8 @@ function renderPlanCard(force){
   const date=pDate(),today=tk();
   const blocks=liveItems(S.plan).filter(b=>b.date===date).sort((a,b)=>(hm2min(a.pStart)||0)-(hm2min(b.pStart)||0));
   const act=Object.keys(S.active||{}).filter(k=>k.startsWith('w_')).map(k=>S.active[k]).filter(a=>a&&a.planId);
-  const sig=date+JSON.stringify(blocks)+act.map(a=>a.planId+a.start).join()+Math.floor(Date.now()/60000);
+  const pausedAct=Object.keys(S.active||{}).filter(k=>k.startsWith('wp_')).map(k=>S.active[k]).filter(a=>a&&a.planId);
+  const sig=date+JSON.stringify(blocks)+act.map(a=>a.planId+a.start).join()+pausedAct.map(a=>a.planId+a.pausedAt).join()+Math.floor(Date.now()/60000);
   if(!force&&sig===_planSig)return;
   _planSig=sig;
   const lbl=document.getElementById('plan-date-lbl');
@@ -2632,26 +2648,31 @@ function renderPlanCard(force){
   const P=blocks.reduce((s,b)=>s+b.pMin,0);
   const fin=blocks.filter(b=>b.aMin!=null);
   const FP=fin.reduce((s,b)=>s+b.pMin,0),FA=fin.reduce((s,b)=>s+b.aMin,0);
-  if(sum)sum.innerHTML=blocks.length?`Planned <b>${fmt(P)}</b>`+(fin.length?` · Done ${fin.length}/${blocks.length} · <span style="color:${devColor((FA-FP)/FP*100)};font-weight:700">${fmt(FA)} vs ${fmt(FP)} (${fmtDev((FA-FP)/FP*100)})</span>`:''):'';
+  const urg=blocks.filter(b=>b.urgent),UA=urg.reduce((s,b)=>s+(b.aMin!=null?b.aMin:0),0);
+  if(sum)sum.innerHTML=blocks.length?`Planned <b>${fmt(P-urg.reduce((s,b)=>s+b.pMin,0))}</b>`+(urg.length?` · <span style="color:#e0a030;font-weight:700">⚡ ${urg.length} urgent${UA?' ('+fmt(UA)+')':''}</span>`:'')+(fin.length?` · Done ${fin.length}/${blocks.length} · <span style="color:${devColor((FA-FP)/FP*100)};font-weight:700">${fmt(FA)} vs ${fmt(FP)} (${fmtDev((FA-FP)/FP*100)})</span>`:''):'';
   if(!blocks.length){el.innerHTML=`<div style="font-size:12px;color:var(--muted);padding:8px 0 2px;line-height:1.6">Plan your day: add blocks with a start time and an estimate. After you work, record the real start/end — the report shows how far off you were.</div>`;return;}
   const rows=blocks.map(b=>{
     const running=act.find(a=>a.planId===b.id);
+    const pausedA=pausedAct.find(a=>a.planId===b.id);
     const pe=min2hm((hm2min(b.pStart)||0)+b.pMin);
     const proj=b.projId?projById(b.projId):null;
     let right='',sub=proj&&proj.name!==b.title?escapeHtml(proj.name)+(b.ptype?' · ':''):'';
     sub+=b.ptype?escapeHtml(b.ptype):'';
-    if(running){
+    if(pausedA){
+      const e=Math.round((pausedA.pausedAt-pausedA.start)/60000);
+      right=`<div style="text-align:right"><div style="font-size:12px;font-weight:700;color:#e0a030">⏸ ${fmt(e)} / ${fmt(b.pMin)}</div><div style="display:flex;gap:4px;margin-top:3px;justify-content:flex-end"><button class="plan-mini" style="width:auto;padding:0 8px;font-size:11px;font-weight:700;color:var(--work);border-color:var(--work)" onclick="event.stopPropagation();resumePlanBlock('${b.id}')">▶ Resume</button><button class="plan-mini" style="width:auto;padding:0 8px;font-size:11px;font-weight:700" onclick="event.stopPropagation();stopPausedBlock('${b.id}')">■ Stop</button></div></div>`;
+    }else if(running){
       const e=Math.round(elMin(running.start));
-      right=`<div style="text-align:right"><div style="font-size:12px;font-weight:700;color:${e>b.pMin?'#e0524d':'var(--work)'}">⏱ ${fmt(e)} / ${fmt(b.pMin)}</div><button class="plan-mini" style="width:auto;padding:0 10px;margin-top:3px;font-size:11px;font-weight:700" onclick="event.stopPropagation();toggleWork('${b.wtype||'design'}')">■ Stop</button></div>`;
+      right=`<div style="text-align:right"><div style="font-size:12px;font-weight:700;color:${e>b.pMin?'#e0524d':'var(--work)'}">⏱ ${fmt(e)} / ${fmt(b.pMin)}</div><div style="display:flex;gap:4px;margin-top:3px;justify-content:flex-end"><button class="plan-mini" style="width:auto;padding:0 8px;font-size:11px;font-weight:700;color:#e0a030;border-color:#e0a030" onclick="event.stopPropagation();pausePlanBlock('${b.id}')">⏸ Pause</button><button class="plan-mini" style="width:auto;padding:0 8px;font-size:11px;font-weight:700" onclick="event.stopPropagation();toggleWork('${b.wtype||'design'}')">■ Stop</button></div></div>`;
     }else if(b.aMin!=null){
       const dv=blockDev(b);
-      right=`<div style="text-align:right"><div style="font-size:13px;font-weight:700;color:${devColor(dv)}">${fmt(b.aMin)} <span style="font-size:10px">${fmtDev(dv)}</span></div><div style="font-size:9px;color:var(--muted)">${b.aStart}–${b.aEnd}</div></div>`;
+      right=`<div style="text-align:right"><div style="font-size:13px;font-weight:700;color:${devColor(dv)}">${fmt(b.aMin)} <span style="font-size:10px">${fmtDev(dv)}</span></div><div style="font-size:9px;color:var(--muted)">${b.aStart}–${b.aEnd}${b.paused?' · ⏸'+fmt(b.paused):''}</div></div>`;
     }else if(date===today){
       right=`<button class="plan-mini" style="width:auto;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--work);border-color:var(--work)" onclick="event.stopPropagation();startPlanBlock('${b.id}')">▶ Start</button>`;
     }else right=`<span style="font-size:11px;color:var(--muted)">${fmt(b.pMin)}</span>`;
     return `<div onclick="showPlanModal('${b.id}')" style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer">
       <div style="width:42px;flex-shrink:0;font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);line-height:1.4">${b.pStart}<br>${pe}</div>
-      <div style="flex:1;min-width:0"><div style="font-size:14px;color:var(--text);word-break:break-word">${escapeHtml(b.title)}</div>${sub?`<div style="font-size:10px;color:var(--muted);margin-top:1px">${sub}</div>`:''}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:14px;color:var(--text);word-break:break-word">${b.urgent?'<span style="color:#e0a030">⚡</span> ':''}${escapeHtml(b.title)}</div>${sub?`<div style="font-size:10px;color:var(--muted);margin-top:1px">${sub}</div>`:''}</div>
       <div style="flex-shrink:0">${right}</div></div>`;
   }).join('');
   el.innerHTML=planTimeline(blocks,date)+rows;
@@ -2680,6 +2701,7 @@ function showPlanModal(id){
     <div style="flex:1;min-width:0"><label class="mlbl">Date</label><input type="date" id="pl-date" value="${date}"></div>
     <div style="flex:1;min-width:0"><label class="mlbl">Start</label><input type="time" id="pl-start" value="${start}" oninput="plRefresh()"></div>
   </div>
+  <label style="display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:700;margin:4px 0 10px;color:#e0a030">⚡ Urgent (not planned ahead)<input type="checkbox" id="pl-urgent" ${(b?b.urgent:isUrgentNew(date))?'checked':''} style="width:18px;height:18px;margin:0;accent-color:#e0a030"></label>
   <label class="mlbl">Estimate</label>
   <div>${[15,30,45,60,90,120,180].map(m=>`<button type="button" class="plan-chip" onclick="document.getElementById('pl-min').value=${m};plRefresh()">${m>=60?(m/60)+'h':m+'m'}</button>`).join('')}</div>
   <div style="display:flex;gap:10px;align-items:center"><input type="number" id="pl-min" value="${mins}" min="5" step="5" oninput="plRefresh()" style="flex:1"><span id="pl-end" style="font-size:12px;color:var(--muted);flex:1"></span></div>
@@ -2739,7 +2761,8 @@ function savePlanBlock(id){
   const f={
     title,projId:projId||null,ptype:$('pl-type').value||'',wtype:$('pl-wtype').value||'design',
     date:$('pl-date').value||pDate(),pStart:$('pl-start').value||'09:00',pMin:Math.max(5,parseInt($('pl-min').value)||60),
-    aStart:$('pl-astart').value||null,aEnd:$('pl-aend').value||null,wasted:parseFloat($('pl-wasted').value)||0
+    aStart:$('pl-astart').value||null,aEnd:$('pl-aend').value||null,wasted:parseFloat($('pl-wasted').value)||0,
+    urgent:!!$('pl-urgent')?.checked
   };
   f.aMin=(f.aStart&&f.aEnd)?actMinOf(f):null;
   let b=id?S.plan.find(x=>x.id===id):null;
@@ -2762,16 +2785,86 @@ function startPlanBlock(id){
   const other=WTYPES.find(t=>S.active['w_'+t]);
   if(other){alert('Stop '+other+' first!');return;}
   const proj=(b.projId&&projById(b.projId)?projById(b.projId).name:b.title);
-  S.active['w_'+type]={start:nowTs(),proj,ptype:b.ptype||'',planId:b.id};
+  const _t0=nowTs();S.active['w_'+type]={start:_t0,origStart:_t0,pausedMs:0,proj,ptype:b.ptype||'',planId:b.id};
   addRecentSession(b.ptype||'',proj);
-  b.aStart=tsToHM(nowTs());b.aEnd=null;b.aMin=null;b.wasted=0;touchP(b);
+  b.aStart=tsToHM(nowTs());b.aEnd=null;b.aMin=null;b.wasted=0;b.paused=0;touchP(b);
   save();updateWorkUI();syncActiveToFirestore();plannerChanged();
 }
-function finishPlanBlock(id,startTs,wst){
+function finishPlanBlock(id,startTs,wst,pausedMin){
   const b=liveItems(S.plan).find(x=>x.id===id);if(!b)return;
-  b.aStart=tsToHM(startTs);b.aEnd=tsToHM(nowTs());b.wasted=wst||0;b.aMin=actMinOf(b);
+  b.aStart=tsToHM(startTs);b.aEnd=tsToHM(nowTs());b.wasted=wst||0;b.paused=Math.round(pausedMin||0);b.aMin=actMinOf(b);
   touchP(b);plannerChanged();
   if(S.gcalAuto)gcalPushBlock(b).catch(e=>console.warn('gcal',e));
+}
+
+// ---------- Pause / Resume / Urgent interrupt ----------
+// A paused session moves from S.active['w_<type>'] to S.active['wp_<planId>'] (so it no longer blocks other work).
+// On resume, start is pushed forward by the paused duration, so every existing timer (elMin/elSec) shows net work time.
+const urgentCutoffMin=()=>hm2min(S.urgentAfter||'10:00')??600;
+function isUrgentNew(date){return date===tk()&&tsToMytMin(Date.now())>=urgentCutoffMin();}
+function pausePlanBlock(id){
+  const type=WTYPES.find(t=>S.active['w_'+t]&&S.active['w_'+t].planId===id);if(!type)return;
+  const a=S.active['w_'+type];
+  a.type=type;a.pausedAt=nowTs();
+  S.active['wp_'+id]=a;delete S.active['w_'+type];
+  if(window._swReg?.active)window._swReg.active.postMessage({type:'CLEAR',tag:'owlf-work'});
+  save();updateWorkUI();syncActiveToFirestore();plannerChanged();
+}
+function resumePlanBlock(id){
+  const a=S.active['wp_'+id];if(!a)return;
+  const type=a.type||'design';
+  const other=WTYPES.find(t=>S.active['w_'+t]);
+  if(other){alert('Pause or stop the running '+other+' task first.');return;}
+  const gap=nowTs()-a.pausedAt;
+  a.start+=gap;a.pausedMs=(a.pausedMs||0)+gap;delete a.pausedAt;
+  S.active['w_'+type]=a;delete S.active['wp_'+id];
+  closeModal();save();updateWorkUI();syncActiveToFirestore();plannerChanged();
+}
+function stopPausedBlock(id){
+  const a=S.active['wp_'+id];if(!a)return;
+  const other=WTYPES.find(t=>S.active['w_'+t]);
+  if(other){alert('Pause or stop the running '+other+' task first.');return;}
+  resumePlanBlock(id);               // net time is unchanged by resume+stop
+  toggleWork(a.type||'design');      // opens the normal Stop dialog
+}
+function offerResume(){
+  const paused=Object.keys(S.active||{}).filter(k=>k.startsWith('wp_')).map(k=>S.active[k]).filter(a=>a&&a.planId);
+  if(!paused.length||WTYPES.some(t=>S.active['w_'+t]))return;
+  const rows=paused.map(a=>{const b=liveItems(S.plan).find(x=>x.id===a.planId);if(!b)return'';
+    return `<button class="plan-btn" style="width:100%;margin-bottom:8px;text-align:left" onclick="resumePlanBlock('${b.id}')">▶ Resume · ${escapeHtml(b.title)} <span style="color:var(--muted);font-weight:500">(${fmt(Math.round((a.pausedAt-a.start)/60000))} done)</span></button>`;}).join('');
+  if(!rows)return;
+  showModal(`<h3 style="color:#e0a030">⏸ Paused tasks</h3><p style="color:var(--muted);font-size:13px;margin-bottom:10px">Back to what you interrupted?</p>${rows}<div class="mbtns"><button class="bcanc" onclick="closeModal()">Not now</button></div>`,null);
+}
+function showUrgentModal(){
+  const run=WTYPES.map(t=>S.active['w_'+t]).find(a=>a);
+  if(run&&!run.planId){alert('Stop the current non-plan session first.');return;}
+  const rb=run?liveItems(S.plan).find(x=>x.id===run.planId):null;
+  const types=S.projectTypes||[];
+  showModal(`<h3 style="color:#e0a030">⚡ Urgent task</h3>
+  ${rb?`<p style="color:var(--muted);font-size:13px;margin-bottom:10px">“${escapeHtml(rb.title)}” will be paused, and you can resume it afterwards.</p>`:''}
+  <label class="mlbl">What came up?</label>
+  <input type="text" id="ug-title" placeholder="e.g. Client fix" style="border-color:#e0a030">
+  <div style="display:flex;gap:8px">
+    <div style="flex:1;min-width:0"><label class="mlbl">Type</label><select id="ug-type"><option value="">—</option>${types.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}</select></div>
+    <div style="flex:1;min-width:0"><label class="mlbl">Counts as</label><select id="ug-wtype"><option value="design">Design</option><option value="games">Games</option><option value="clients">Clients</option></select></div>
+  </div>
+  <label class="mlbl">Rough estimate (min)</label><input type="number" id="ug-min" value="30" min="5" step="5">
+  <div class="mbtns"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" style="background:#e0a030;color:#1a1000" onclick="startUrgent()">Pause &amp; start</button></div>`,null);
+  setTimeout(()=>document.getElementById('ug-title')?.focus(),80);
+}
+function startUrgent(){
+  const title=(document.getElementById('ug-title').value||'').trim();
+  if(!title){alert('Name the urgent task.');return;}
+  const run=WTYPES.map(t=>S.active['w_'+t]).find(a=>a);
+  if(run&&run.planId)pausePlanBlock(run.planId);
+  if(!S.plan)S.plan=[];
+  const now=nowTs();
+  const b={id:uid(),gcalP:null,gcalA:null,deleted:false,created:new Date().toISOString(),
+    title,projId:null,ptype:document.getElementById('ug-type').value||'',wtype:document.getElementById('ug-wtype').value||'design',
+    date:tk(),pStart:tsToHM(now),pMin:Math.max(5,parseInt(document.getElementById('ug-min').value)||30),
+    aStart:null,aEnd:null,aMin:null,wasted:0,paused:0,urgent:true};
+  S.plan.push(b);touchP(b);
+  closeModal();startPlanBlock(b.id);
 }
 // Overrun alert: running planned block passes its estimate
 setInterval(()=>{try{
@@ -4889,6 +4982,84 @@ function updateExUI(){
 }
 
  
+
+// ═══ AUTO UPDATE ═══
+// Web/PWA : re-fetches index.html and compares a hash; reloads itself when it changed (if nothing is running).
+// Android : the APK build stamps its commit id into APP_BUILD; the app compares it with the latest release
+//           ("apk-latest", built on every push to main) and offers a one-tap download of the new APK.
+const APP_BUILD='__BUILD_ID__';
+const UPD_REPO='CKJ5/owlf-timelog';
+let _updBusy=false,_updInfo=null,_updDismissed=false;
+function _updIdle(){
+  try{
+    if(S.active&&Object.keys(S.active).length)return false;
+    const mo=document.getElementById('modal-overlay');if(mo&&!mo.classList.contains('hidden'))return false;
+    const wk=document.getElementById('wk-overlay');if(wk&&!wk.classList.contains('hidden'))return false;
+    const ae=document.activeElement;if(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))return false;
+    return true;
+  }catch(e){return false;}
+}
+async function _updHash(t){
+  try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return[...new Uint8Array(b)].slice(0,8).map(x=>x.toString(16).padStart(2,'0')).join('');}
+  catch(e){let h=0;for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))|0;return t.length+'-'+h;}
+}
+function _updSay(m){const el=document.getElementById('upd-status');if(el)el.textContent=m;}
+function updAutoOn(){try{return localStorage.getItem('owlf_noauto_update')!=='1';}catch(e){return true;}}
+function updSetAuto(v){try{localStorage.setItem('owlf_noauto_update',v?'0':'1');}catch(e){}}
+async function checkForUpdate(manual){
+  if(_updBusy)return;_updBusy=true;
+  try{
+    if(!navigator.onLine){if(manual)_updSay('Offline — try again later');return;}
+    if(window._swReg&&window._swReg.update)window._swReg.update().catch(()=>{});
+    if(NATIVE){
+      if(!/^[0-9a-f]{7}$/i.test(APP_BUILD)){if(manual)_updSay('Dev build — no update check');return;}
+      const r=await fetch(`https://api.github.com/repos/${UPD_REPO}/releases/tags/apk-latest`,{cache:'no-store'});
+      if(!r.ok)throw new Error('GitHub '+r.status);
+      const j=await r.json();
+      const m=/Build:\s*([0-9a-f]{7,40})/i.exec(j.body||'');
+      const asset=(j.assets||[]).find(a=>/\.apk$/i.test(a.name));
+      if(m&&asset&&!m[1].toLowerCase().startsWith(APP_BUILD.toLowerCase())){
+        _updInfo={kind:'apk',url:asset.browser_download_url,build:m[1].slice(0,7)};
+        _updSay('New APK available ('+_updInfo.build+') — you have '+APP_BUILD);
+        showUpdateBanner();
+      }else _updSay('Up to date ✓ ('+APP_BUILD+')');
+    }else{
+      const u=new URL('./index.html',location.href);u.searchParams.set('_',Date.now());
+      const r=await fetch(u.href,{cache:'no-store'});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      const h=await _updHash(await r.text());
+      let base=null;try{base=localStorage.getItem('owlf_page_hash');}catch(e){}
+      if(!base){try{localStorage.setItem('owlf_page_hash',h);}catch(e){}_updSay('Up to date ✓');return;}
+      if(base===h){_updSay('Up to date ✓');return;}
+      _updInfo={kind:'web',hash:h};
+      _updSay('New version found');
+      if(updAutoOn()&&_updIdle())applyUpdate();else showUpdateBanner();
+    }
+  }catch(e){console.warn('Update check failed',e);if(manual)_updSay('Check failed: '+(e.message||e));}
+  finally{_updBusy=false;}
+}
+function showUpdateBanner(){
+  if(!_updInfo||_updDismissed||document.getElementById('upd-banner'))return;
+  const d=document.createElement('div');d.id='upd-banner';
+  d.style.cssText='position:fixed;left:12px;right:12px;bottom:76px;z-index:9000;display:flex;align-items:center;gap:8px;background:var(--bg2);border:1.5px solid var(--work);border-radius:14px;padding:10px 12px;box-shadow:var(--shadow)';
+  d.innerHTML=`<div style="flex:1;font-size:13px;font-weight:700;color:var(--text)">🔄 ${_updInfo.kind==='apk'?'New app version available':'New version ready'}</div><button onclick="applyUpdate()" style="padding:7px 14px;border-radius:9px;border:none;background:var(--work);color:#1a1000;font-weight:700;font-family:inherit;font-size:13px;cursor:pointer">${_updInfo.kind==='apk'?'Download':'Update'}</button><button onclick="_updDismissed=true;this.parentNode.remove()" style="padding:7px 10px;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:inherit;cursor:pointer">✕</button>`;
+  document.body.appendChild(d);
+}
+async function applyUpdate(){
+  if(!_updInfo)return;
+  if(_updInfo.kind==='apk'){location.href=_updInfo.url;return;}
+  try{
+    if(typeof save!=='undefined'&&save._t){clearTimeout(save._t);save._t=null;}
+    try{save();}catch(e){}
+    if(typeof syncToFirestore==='function')await Promise.race([syncToFirestore(),new Promise(r=>setTimeout(r,2500))]);
+    try{localStorage.setItem('owlf_page_hash',_updInfo.hash);}catch(e){}
+    location.reload();
+  }catch(e){location.reload();}
+}
+setTimeout(()=>checkForUpdate(false),4000);
+setInterval(()=>checkForUpdate(false),30*60*1000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(()=>checkForUpdate(false),800);});
+window.addEventListener('online',()=>checkForUpdate(false));
 
 // ═══ LIVE TICK ═══
 let _entWarn10Sent=false; // reset each day

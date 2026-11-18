@@ -1,6 +1,6 @@
 {
   "name": "owlf-timelog",
-  "version": "4.10.1",
+  "version": "4.11.0",
   "private": true,
   "description": "OWLF time log — web app + Capacitor Android wrapper",
   "scripts": {

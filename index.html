@@ -637,8 +637,8 @@ body.light .prep-btn.act-prep{box-shadow:0 3px 18px rgba(19,181,166,.28)}
 .sw-sub{font-size:9px;color:var(--muted);margin-top:1px}
 
 /* PAGE SWIPE CONTAINER */
-#page-container{display:flex;width:400%;transition:transform .32s cubic-bezier(.4,0,.2,1);will-change:transform;align-items:flex-start;touch-action:pan-y}
-.page{width:25%;padding:12px 14px 20px;flex-shrink:0;touch-action:pan-y}
+#page-container{display:flex;width:500%;transition:transform .32s cubic-bezier(.4,0,.2,1);will-change:transform;align-items:flex-start;touch-action:pan-y}
+.page{width:20%;padding:12px 14px 20px;flex-shrink:0;touch-action:pan-y}
 
 /* PAGE HEADER with inline streak */
 .page-hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-top:8px;margin-bottom:12px}
@@ -658,6 +658,25 @@ body.light .prep-btn.act-prep{box-shadow:0 3px 18px rgba(19,181,166,.28)}
 .tab-btn[data-tab="reports"].active{color:var(--text)}
 .tab-dot{width:18px;height:2px;border-radius:2px;background:currentColor;opacity:.35}
 .tab-btn.active .tab-dot{opacity:1}
+.tab-btn[data-tab="plan"].active{color:#7aa2f7}
+.plan-color{color:#7aa2f7}
+#page-plan .plan-wrap{max-width:1320px;margin:0 auto}
+#page-plan .plan-layout{display:block}
+.hist-det{display:none;margin-top:8px}
+.hist-day.open .hist-det{display:block}
+.hist-day{border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--bg3)}
+.hist-day .hist-hd{cursor:pointer}
+.pl-statgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.pl-stat{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:8px 6px;text-align:center}
+.pl-stat b{display:block;font-family:'Space Mono',monospace;font-size:15px}
+.pl-stat span{font-size:9px;color:var(--muted);letter-spacing:.04em}
+@media (min-width:900px){
+  #page-plan .plan-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:start}
+  .hist-det{display:block}
+  .pl-statgrid{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .tab-bar{justify-content:center}
+  .tab-btn{max-width:170px}
+}
 
 /* CARDS */
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}
@@ -1358,6 +1377,58 @@ function installPWA(){
 <div style="overflow:hidden;width:100%">
 <div id="page-container">
 
+<!-- ════ PLAN PAGE ════ -->
+<div class="page" id="page-plan" style="align-self:flex-start">
+ <div class="plan-wrap">
+  <div class="page-hdr">
+    <div class="page-hdr-left">
+      <span class="sec-lbl plan-color">Plan</span>
+      <div class="sec-title plan-color">Day Planner</div>
+    </div>
+    <div class="page-hdr-right">
+      <div class="inline-streak-num" id="plan-load-num" style="color:#7aa2f7;font-size:22px">—</div>
+      <div class="inline-streak-sub" id="plan-load-sub">nothing planned</div>
+    </div>
+  </div>
+  <div class="plan-layout">
+   <div class="plan-col">
+    <div class="card" id="plan-card">
+      <div class="card-hdr">
+        <span class="card-lbl" style="color:#7aa2f7">📋 Whole-day plan</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button class="plan-mini" onclick="planNav(-1)">‹</button>
+          <span id="plan-date-lbl" style="font-size:11px;font-weight:700;color:var(--muted);min-width:92px;text-align:center"></span>
+          <button class="plan-mini" onclick="planNav(1)">›</button>
+        </div>
+      </div>
+      <div id="plan-quick" style="display:flex;gap:6px;margin-bottom:8px"></div>
+      <div style="display:flex;gap:12px;font-size:10px;color:var(--muted);margin-bottom:4px"><span style="color:var(--work)">■ Work</span><span style="color:var(--life)">■ Life</span><span style="color:var(--ex)">■ Exercise</span></div>
+      <div id="plan-sum" style="font-size:12px;color:var(--muted);margin-bottom:2px"></div>
+      <div id="plan-body"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="plan-btn pri" onclick="showPlanModal()">＋ Add block</button>
+        <button class="plan-btn" style="color:#e0a030;border-color:#e0a030;flex:0 0 auto" onclick="showUrgentModal()">⚡ Urgent</button>
+        <button class="plan-btn" onclick="showCopyModal()">📋 Copy day</button>
+        <button class="plan-btn" onclick="showProjectsModal()">📁 Projects</button>
+        <button class="plan-btn" onclick="showCalModal()">📅</button>
+      </div>
+    </div>
+    <div class="card" id="plan-opt-card">
+      <div class="card-hdr"><span class="card-lbl" style="color:#7aa2f7">💡 How to optimise this day</span></div>
+      <div id="plan-insights"></div>
+    </div>
+   </div>
+   <div class="plan-col">
+    <div class="card" id="plan-hist-card">
+      <div class="card-hdr"><span class="card-lbl" style="color:#7aa2f7">🔎 Track record — what you actually did</span><div id="hist-range" style="display:flex;gap:4px"></div></div>
+      <div id="hist-stats"></div>
+      <div id="hist-days"></div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>
+
 <!-- ════ WORK PAGE ════ -->
 <div class="page" id="page-work" style="align-self:flex-start">
   <div class="page-hdr">
@@ -1458,23 +1529,9 @@ function installPWA(){
   </div>
 </div>
 
-<div class="card" id="plan-card">
-  <div class="card-hdr">
-    <span class="card-lbl" style="color:var(--work)">📋 Plan</span>
-    <div style="display:flex;align-items:center;gap:6px">
-      <button class="plan-mini" onclick="planNav(-1)">‹</button>
-      <span id="plan-date-lbl" style="font-size:11px;font-weight:700;color:var(--muted);min-width:92px;text-align:center"></span>
-      <button class="plan-mini" onclick="planNav(1)">›</button>
-    </div>
-  </div>
-  <div id="plan-sum" style="font-size:12px;color:var(--muted);margin-bottom:2px"></div>
-  <div id="plan-body"></div>
-  <div style="display:flex;gap:8px;margin-top:12px">
-    <button class="plan-btn pri" onclick="showPlanModal()">＋ Add block</button>
-    <button class="plan-btn" style="color:#e0a030;border-color:#e0a030;flex:0 0 auto" onclick="showUrgentModal()">⚡ Urgent</button>
-    <button class="plan-btn" onclick="showProjectsModal()">📁 Projects</button>
-    <button class="plan-btn" onclick="showCalModal()">📅</button>
-  </div>
+<div class="card" id="work-next-card" style="display:none">
+  <div class="card-hdr"><span class="card-lbl" style="color:var(--work)">⏭ Next on your plan</span><button class="plan-mini" style="width:auto;padding:0 10px;font-size:11px" onclick="goTab(0)">Open Plan ›</button></div>
+  <div id="work-next-body"></div>
 </div>
 
 <div class="card" id="ai-card">
@@ -1873,10 +1930,11 @@ function installPWA(){
 
 <!-- TAB BAR -->
 <div class="tab-bar">
-  <button class="tab-btn active" data-tab="work" onclick="goTab(0)"><div class="tab-dot"></div>Work</button>
-  <button class="tab-btn" data-tab="life" onclick="goTab(1)"><div class="tab-dot"></div>Life</button>
-  <button class="tab-btn" data-tab="exercise" onclick="goTab(2)"><div class="tab-dot"></div>Exercise</button>
-  <button class="tab-btn" data-tab="reports" onclick="goTab(3)"><div class="tab-dot"></div>Reports</button>
+  <button class="tab-btn" data-tab="plan" onclick="goTab(0)"><div class="tab-dot"></div>Plan</button>
+  <button class="tab-btn active" data-tab="work" onclick="goTab(1)"><div class="tab-dot"></div>Work</button>
+  <button class="tab-btn" data-tab="life" onclick="goTab(2)"><div class="tab-dot"></div>Life</button>
+  <button class="tab-btn" data-tab="exercise" onclick="goTab(3)"><div class="tab-dot"></div>Exercise</button>
+  <button class="tab-btn" data-tab="reports" onclick="goTab(4)"><div class="tab-dot"></div>Reports</button>
 </div>
 
 <!-- END: HTML -->
@@ -2366,12 +2424,13 @@ let rCalYear=yk();  // year shown in monthly/yearly calendar
 
 function goTab(idx){
   curPage=idx;
-  container().style.transform=`translateX(-${idx*25}%)`;
+  container().style.transform=`translateX(-${idx*20}%)`;
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
   updateTopStreak();
-  if(idx===3)renderReport();
+  if(idx===0)planPageShow();
+  if(idx===4)renderReport();
   // Show page swipe flash
-  if(idx===3){
+  if(idx===4){
     const flash=document.getElementById('page-swipe-flash');
     if(flash){
       flash.textContent='Reports · '+rMode.charAt(0).toUpperCase()+rMode.slice(1)+' · '+rSel;
@@ -2397,7 +2456,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     const adx=Math.abs(dx);
     // Only swipe if: clearly horizontal (dx>>dy), significant movement, not a tap
     if(adx<70||dy>adx*0.6)return;
-    if(curPage<3){goTab(Math.max(0,Math.min(3,curPage+(dx>0?1:-1))));}
+    if(curPage<4){goTab(Math.max(0,Math.min(4,curPage+(dx>0?1:-1))));}
     else{navigateReport(dx>0?1:-1);}
   },{passive:true});
 });
@@ -2405,10 +2464,10 @@ function navigateReportLegacy_removed(){}
 
 // ═══ TOP STREAK UPDATE ═══
 function updateTopStreak(){
-  const labels=['OWLF STREAK','SLEEP STREAK','TARGET STREAK',''];
-  const subs=[fmt(S.workMin||180)+'/day',(S.sleepTarget||7)+'h+ sleep/days','更に向こうへ',''];
-  const nums=[(S.work&&S.work.streak)||0,(S.life&&S.life.sleepStreak)||0,(S.exercise&&S.exercise.streak)||0,0];
-  const subTexts=[moWorkHits()+' hits this mo.', ((S.life&&S.life.sleepStreak)||0)+' day streak', moExHits()+' this mo.', ''];
+  const labels=['','OWLF STREAK','SLEEP STREAK','TARGET STREAK',''];
+  const subs=['',fmt(S.workMin||180)+'/day',(S.sleepTarget||7)+'h+ sleep/days','更に向こうへ',''];
+  const nums=[0,(S.work&&S.work.streak)||0,(S.life&&S.life.sleepStreak)||0,(S.exercise&&S.exercise.streak)||0,0];
+  const subTexts=['',moWorkHits()+' hits this mo.', ((S.life&&S.life.sleepStreak)||0)+' day streak', moExHits()+' this mo.', ''];
   const el=id=>document.getElementById(id); // safe getter — returns null if missing, no throw
   const set=(id,val)=>{const e=el(id);if(e)e.textContent=val;};
   const setStyle=(id,prop,val)=>{const e=el(id);if(e)e.style[prop]=val;};
@@ -2416,10 +2475,10 @@ function updateTopStreak(){
   set('top-streak-title',subs[curPage]);
   set('top-streak-num',nums[curPage]);
   set('top-streak-sub',subTexts[curPage]);
-  setStyle('top-streak-num','color',['var(--work)','var(--life)','var(--ex)','var(--text)'][curPage]);
-  animateStreakNumber(el('work-streak-inline'),nums[0]);
+  setStyle('top-streak-num','color',['#7aa2f7','var(--work)','var(--life)','var(--ex)','var(--text)'][curPage]);
+  animateStreakNumber(el('work-streak-inline'),nums[1]);
   set('work-streak-sub',moWorkHits()+' hits this mo.');
-  animateStreakNumber(el('life-streak-inline'),nums[1]);
+  animateStreakNumber(el('life-streak-inline'),nums[2]);
   animateStreakNumber(el('ex-streak-inline'),(S.exercise&&S.exercise.streak)||0);
   set('ex-streak-sub',moExHits()+' hits this mo.');
 }
@@ -2584,7 +2643,7 @@ const pDate=()=>planDate||tk();
 const liveItems=a=>(a||[]).filter(x=>x&&!x.deleted);
 function touchP(x){x.updated=Math.max(Date.now(),(x.updated||0)+1);}
 function plannerChanged(){
-  save();renderPlanCard(true);renderPva();
+  save();renderPlanCard(true);renderPva();renderPlanExtras();
   clearTimeout(plannerChanged._t);
   plannerChanged._t=setTimeout(()=>{if(typeof syncPlanner==='function')syncPlanner();},400);
 }
@@ -2606,7 +2665,7 @@ function projActualMin(p){
 }
 function typeStats(){
   const m={};
-  liveItems(S.plan).filter(b=>b.aMin!=null&&b.pMin>0&&!b.urgent).forEach(b=>{const k=b.ptype||'';const o=m[k]||(m[k]={n:0,p:0,a:0});o.n++;o.p+=b.pMin;o.a+=b.aMin;});
+  liveItems(S.plan).filter(b=>isWorkB(b)&&b.aMin!=null&&b.pMin>0&&!b.urgent).forEach(b=>{const k=b.ptype||'';const o=m[k]||(m[k]={n:0,p:0,a:0});o.n++;o.p+=b.pMin;o.a+=b.aMin;});
   return m;
 }
 function estBar(act,est){
@@ -2621,7 +2680,7 @@ function planNav(delta){
   const [y,m,d]=pDate().split('-').map(Number);
   planDate=new Date(Date.UTC(y,m-1,d+delta)).toISOString().slice(0,10);
   if(planDate===tk())planDate=null;
-  renderPlanCard(true);
+  renderPlanCard(true);renderPlanExtras();
 }
 function suggestStart(date){
   const bs=liveItems(S.plan).filter(b=>b.date===date);
@@ -2648,13 +2707,14 @@ function planTimeline(blocks,date){
   let grid='';
   for(let m=lo;m<=hi;m+=step)grid+=`<div style="position:absolute;left:${x(m)}%;top:0;bottom:0;border-left:1px dashed var(--border)"></div><div style="position:absolute;left:${x(m)}%;bottom:-13px;font-size:8px;color:var(--muted);transform:translateX(-50%)">${pad(Math.floor(m/60)%24)}</div>`;
   if(nowMin!=null&&nowMin>=lo&&nowMin<=hi)grid+=`<div style="position:absolute;left:${x(nowMin)}%;top:-3px;bottom:-3px;width:2px;background:#e0524d;border-radius:2px;z-index:3"></div>`;
-  const planBars=segs.map(s=>`<div style="position:absolute;left:${x(s.ps)}%;width:${((s.pe-s.ps)/T*100).toFixed(2)}%;top:0;bottom:0;border:1.5px solid var(--work);background:color-mix(in srgb,var(--work) 18%,transparent);border-radius:4px"></div>`).join('');
-  const actBars=segs.filter(s=>s.as!=null).map(s=>{const dv=s.b.aEnd?blockDev(s.b):null;return`<div style="position:absolute;left:${x(s.as)}%;width:${Math.max(.8,(s.ae-s.as)/T*100).toFixed(2)}%;top:0;bottom:0;background:${s.b.aEnd?devColor(dv):'var(--work)'};border-radius:4px;${s.b.aEnd?'':'opacity:.7'}"></div>`;}).join('');
+  const planBars=segs.map(s=>`<div style="position:absolute;left:${x(s.ps)}%;width:${((s.pe-s.ps)/T*100).toFixed(2)}%;top:0;bottom:0;border:1.5px solid ${PL_COL[planCat(s.b)]};background:color-mix(in srgb,${PL_COL[planCat(s.b)]} 18%,transparent);border-radius:4px"></div>`).join('');
+  const actBars=segs.filter(s=>s.as!=null).map(s=>{const dv=s.b.aEnd?blockDev(s.b):null;return`<div style="position:absolute;left:${x(s.as)}%;width:${Math.max(.8,(s.ae-s.as)/T*100).toFixed(2)}%;top:0;bottom:0;background:${!isWorkB(s.b)?PL_COL[planCat(s.b)]:(s.b.aEnd?devColor(dv):'var(--work)')};border-radius:4px;${s.b.aEnd?'':'opacity:.7'}"></div>`;}).join('');
   const lane=(lbl,inner)=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span style="width:34px;font-size:8px;font-weight:700;letter-spacing:.08em;color:var(--muted)">${lbl}</span><div style="position:relative;flex:1;height:16px;z-index:2">${inner}</div></div>`;
   return `<div style="position:relative;padding-bottom:14px;margin:6px 0 8px"><div style="position:absolute;left:40px;right:0;top:0;bottom:14px;z-index:1">${grid}</div>${lane('PLAN',planBars)}${lane('ACTUAL',actBars)}</div>`;
 }
 function renderPlanCard(force){
   const el=document.getElementById('plan-body');if(!el)return;
+  if(planSyncExercise())force=true;
   const date=pDate(),today=tk();
   const blocks=liveItems(S.plan).filter(b=>b.date===date).sort((a,b)=>(hm2min(a.pStart)||0)-(hm2min(b.pStart)||0));
   const act=Object.keys(S.active||{}).filter(k=>k.startsWith('w_')).map(k=>S.active[k]).filter(a=>a&&a.planId);
@@ -2662,6 +2722,7 @@ function renderPlanCard(force){
   const sig=date+JSON.stringify(blocks)+act.map(a=>a.planId+a.start).join()+pausedAct.map(a=>a.planId+a.pausedAt).join()+Math.floor(Date.now()/60000);
   if(!force&&sig===_planSig)return;
   _planSig=sig;
+  renderWorkNext();
   const lbl=document.getElementById('plan-date-lbl');
   if(lbl)lbl.textContent=(date===today?'Today · ':'')+fmtDueDate(date);
   const sum=document.getElementById('plan-sum');
@@ -2671,14 +2732,16 @@ function renderPlanCard(force){
   const urg=blocks.filter(b=>b.urgent),UA=urg.reduce((s,b)=>s+(b.aMin!=null?b.aMin:0),0);
   if(sum)sum.innerHTML=blocks.length?`Planned <b>${fmt(P-urg.reduce((s,b)=>s+b.pMin,0))}</b>`+(urg.length?` · <span style="color:#e0a030;font-weight:700">⚡ ${urg.length} urgent${UA?' ('+fmt(UA)+')':''}</span>`:'')+(fin.length?` · Done ${fin.length}/${blocks.length} · <span style="color:${devColor((FA-FP)/FP*100)};font-weight:700">${fmt(FA)} vs ${fmt(FP)} (${fmtDev((FA-FP)/FP*100)})</span>`:''):'';
   if(!blocks.length){el.innerHTML=`<div style="font-size:12px;color:var(--muted);padding:8px 0 2px;line-height:1.6">Plan your day: add blocks with a start time and an estimate. After you work, record the real start/end — the report shows how far off you were.</div>`;return;}
-  const rows=blocks.map(b=>{
+  const rowArr=blocks.map(b=>{
     const running=act.find(a=>a.planId===b.id);
     const pausedA=pausedAct.find(a=>a.planId===b.id);
     const pe=min2hm((hm2min(b.pStart)||0)+b.pMin);
     const proj=b.projId?projById(b.projId):null;
     let right='',sub=proj&&proj.name!==b.title?escapeHtml(proj.name)+(b.ptype?' · ':''):'';
     sub+=b.ptype?escapeHtml(b.ptype):'';
-    if(pausedA){
+    const _nw=!isWorkB(b);if(_nw)sub=escapeHtml(b.sub||(planCat(b)==='life'?'Life':'Exercise'));
+    if(_nw){right=planNonWorkRight(b,date,today);}
+    else if(pausedA){
       const e=Math.round((pausedA.pausedAt-pausedA.start)/60000);
       right=`<div style="text-align:right"><div style="font-size:12px;font-weight:700;color:#e0a030">⏸ ${fmt(e)} / ${fmt(b.pMin)}</div><div style="display:flex;gap:4px;margin-top:3px;justify-content:flex-end"><button class="plan-mini" style="width:auto;padding:0 8px;font-size:11px;font-weight:700;color:var(--work);border-color:var(--work)" onclick="event.stopPropagation();resumePlanBlock('${b.id}')">▶ Resume</button><button class="plan-mini" style="width:auto;padding:0 8px;font-size:11px;font-weight:700" onclick="event.stopPropagation();stopPausedBlock('${b.id}')">■ Stop</button></div></div>`;
     }else if(running){
@@ -2690,26 +2753,36 @@ function renderPlanCard(force){
     }else if(date===today){
       right=`<button class="plan-mini" style="width:auto;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--work);border-color:var(--work)" onclick="event.stopPropagation();startPlanBlock('${b.id}')">▶ Start</button>`;
     }else right=`<span style="font-size:11px;color:var(--muted)">${fmt(b.pMin)}</span>`;
-    return `<div onclick="showPlanModal('${b.id}')" style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer">
+    return `<div onclick="showPlanModal('${b.id}')" style="display:flex;gap:10px;align-items:center;padding:9px 0 9px 8px;border-bottom:1px solid var(--border);border-left:3px solid ${PL_COL[planCat(b)]};cursor:pointer">
       <div style="width:42px;flex-shrink:0;font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);line-height:1.4">${b.pStart}<br>${pe}</div>
-      <div style="flex:1;min-width:0"><div style="font-size:14px;color:var(--text);word-break:break-word">${b.urgent?'<span style="color:#e0a030">⚡</span> ':''}${escapeHtml(b.title)}</div>${sub?`<div style="font-size:10px;color:var(--muted);margin-top:1px">${sub}</div>`:''}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:14px;color:var(--text);word-break:break-word">${b.urgent?'<span style="color:#e0a030">⚡</span> ':''}${planIcon(b)} ${escapeHtml(b.title)}</div>${sub?`<div style="font-size:10px;color:var(--muted);margin-top:1px">${sub}</div>`:''}</div>
       <div style="flex-shrink:0">${right}</div></div>`;
-  }).join('');
+  });
+  const rows=planInterleave(blocks,rowArr,date);
   el.innerHTML=planTimeline(blocks,date)+rows;
 }
 
 // ---------- Add / edit block ----------
-function showPlanModal(id){
+function showPlanModal(id,pre){
+  pre=pre||{};
   const b=id?liveItems(S.plan).find(x=>x.id===id):null;
   if(id&&!b)return;
   const projs=liveItems(S.projects).filter(p=>!p.done||(b&&b.projId===p.id));
   const types=S.projectTypes||[];
-  const date=b?b.date:pDate(),start=b?b.pStart:suggestStart(date),mins=b?b.pMin:60;
+  const date=b?b.date:pDate(),start=b?b.pStart:(pre.start||suggestStart(date)),mins=b?b.pMin:(pre.min||60);
+  const cat0=b?planCat(b):(pre.cat||'work'),sub0=b?(b.sub||''):(pre.sub||'');
   const sel=(a,c)=>a===c?' selected':'';
   const running=b&&Object.values(S.active||{}).some(a=>a&&a.planId===b.id);
-  showModal(`<h3 style="color:var(--work)">${b?'✎ Edit block':'📋 New block'}</h3>
-  <label class="mlbl">What are you working on?</label>
-  <input type="text" id="pl-title" value="${escapeHtml(b?b.title:'')}" placeholder="e.g. Logo concepts" style="border-color:var(--work)">
+  showModal(`<h3 style="color:#7aa2f7">${b?'✎ Edit block':'📋 New block'}</h3>
+  <div id="pl-cats" style="display:flex;gap:6px;margin-bottom:8px">
+    <button type="button" class="plan-chip" data-cat="work" style="flex:1;margin:0" onclick="plSetCat('work',undefined,true)">💼 Work</button>
+    <button type="button" class="plan-chip" data-cat="life" style="flex:1;margin:0" onclick="plSetCat('life',undefined,true)">🌿 Life</button>
+    <button type="button" class="plan-chip" data-cat="exercise" style="flex:1;margin:0" onclick="plSetCat('exercise',undefined,true)">🏋️ Exercise</button>
+  </div>
+  <input type="hidden" id="pl-cat" value="${cat0}">
+  <label class="mlbl" id="pl-title-lbl">What are you working on?</label>
+  <input type="text" id="pl-title" oninput="this.dataset.auto=''" value="${escapeHtml(b?b.title:(pre.title||''))}" placeholder="e.g. Logo concepts" style="border-color:var(--work)">
+  <div id="pl-work-f">
   <label class="mlbl">Project</label>
   <select id="pl-proj" onchange="plProjChange()"><option value="">— none —</option>${projs.map(p=>`<option value="${p.id}"${sel(b&&b.projId,p.id)}>${escapeHtml(p.name)}</option>`).join('')}<option value="__new">＋ New project…</option></select>
   <div id="pl-newproj" style="display:none"><div style="display:flex;gap:8px"><input type="text" id="pl-np-name" placeholder="Project name" style="flex:2"><input type="number" id="pl-np-est" placeholder="Total hrs" min="0" step="0.5" style="flex:1"></div></div>
@@ -2717,11 +2790,17 @@ function showPlanModal(id){
     <div style="flex:1;min-width:0"><label class="mlbl">Type</label><select id="pl-type" onchange="plRefresh()"><option value="">—</option>${types.map(t=>`<option value="${escapeHtml(t)}"${sel(b&&b.ptype,t)}>${escapeHtml(t)}</option>`).join('')}</select></div>
     <div style="flex:1;min-width:0"><label class="mlbl">Counts as</label><select id="pl-wtype"><option value="design"${sel(b&&b.wtype,'design')}>Design</option><option value="games"${sel(b&&b.wtype,'games')}>Games</option><option value="clients"${sel(b&&b.wtype,'clients')}>Clients</option></select></div>
   </div>
+  </div>
+  <div id="pl-life-f" style="display:none">
+    <label class="mlbl">Kind</label>
+    <div id="pl-sub-chips"></div>
+    <input type="hidden" id="pl-sub" value="${escapeHtml(sub0)}">
+  </div>
   <div style="display:flex;gap:8px">
     <div style="flex:1;min-width:0"><label class="mlbl">Date</label><input type="date" id="pl-date" value="${date}"></div>
     <div style="flex:1;min-width:0"><label class="mlbl">Start</label><input type="time" id="pl-start" value="${start}" oninput="plRefresh()"></div>
   </div>
-  <label style="display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:700;margin:4px 0 10px;color:#e0a030">⚡ Urgent (not planned ahead)<input type="checkbox" id="pl-urgent" ${(b?b.urgent:isUrgentNew(date))?'checked':''} style="width:18px;height:18px;margin:0;accent-color:#e0a030"></label>
+  <label style="display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:700;margin:4px 0 10px;color:#e0a030">⚡ Urgent (not planned ahead)<input type="checkbox" id="pl-urgent" ${(b?b.urgent:((pre.cat||'work')==='work'&&isUrgentNew(date)))?'checked':''} style="width:18px;height:18px;margin:0;accent-color:#e0a030"></label>
   <label class="mlbl">Estimate</label>
   <div>${[15,30,45,60,90,120,180].map(m=>`<button type="button" class="plan-chip" onclick="document.getElementById('pl-min').value=${m};plRefresh()">${m>=60?(m/60)+'h':m+'m'}</button>`).join('')}</div>
   <div style="display:flex;gap:10px;align-items:center"><input type="number" id="pl-min" value="${mins}" min="5" step="5" oninput="plRefresh()" style="flex:1"><span id="pl-end" style="font-size:12px;color:var(--muted);flex:1"></span></div>
@@ -2736,7 +2815,7 @@ function showPlanModal(id){
   </details>
   <div class="mbtns"><button class="bcanc" onclick="closeModal()">Cancel</button><button class="bconf" style="background:var(--work);color:#1a1000" onclick="savePlanBlock(${b?`'${b.id}'`:''})">${b?'Save':'Add'}</button></div>
   ${b?`<button class="bcanc" style="width:100%;margin-top:8px;border-color:#e0524d;color:#e0524d" onclick="deletePlanBlock('${b.id}')">🗑 Delete</button>`:''}`,null);
-  plRefresh();
+  plRefresh();plSetCat(cat0,sub0);
   if(!b)setTimeout(()=>document.getElementById('pl-title')?.focus(),80);
 }
 function plProjChange(){
@@ -2766,7 +2845,8 @@ function plRefresh(){
 }
 function savePlanBlock(id){
   const $=i=>document.getElementById(i);
-  let title=$('pl-title').value.trim(),projId=$('pl-proj').value;
+  const _cat=$('pl-cat').value||'work',_sub=_cat==='work'?'':($('pl-sub').value||'');
+  let title=$('pl-title').value.trim(),projId=_cat==='work'?$('pl-proj').value:'';
   if(!S.plan)S.plan=[];if(!S.projects)S.projects=[];
   if(projId==='__new'){
     const nm=$('pl-np-name').value.trim();
@@ -2777,9 +2857,10 @@ function savePlanBlock(id){
   }
   const proj=projId?projById(projId):null;
   if(!title&&proj)title=proj.name;
+  if(!title&&_cat!=='work')title=_sub||(_cat==='life'?'Life':'Exercise');
   if(!title){alert('Give this block a title.');return;}
   const f={
-    title,projId:projId||null,ptype:$('pl-type').value||'',wtype:$('pl-wtype').value||'design',
+    title,cat:_cat,sub:_sub,projId:projId||null,ptype:_cat==='work'?($('pl-type').value||''):'',wtype:$('pl-wtype').value||'design',
     date:$('pl-date').value||pDate(),pStart:$('pl-start').value||'09:00',pMin:Math.max(5,parseInt($('pl-min').value)||60),
     aStart:$('pl-astart').value||null,aEnd:$('pl-aend').value||null,wasted:parseFloat($('pl-wasted').value)||0,
     urgent:!!$('pl-urgent')?.checked
@@ -2801,6 +2882,8 @@ function deletePlanBlock(id){
 }
 function startPlanBlock(id){
   const b=liveItems(S.plan).find(x=>x.id===id);if(!b)return;
+  if(planCat(b)==='life'){planMarkDone(id);return;}
+  if(planCat(b)==='exercise'){planOpenWorkout(id);return;}
   const type=b.wtype||'design';
   const other=WTYPES.find(t=>S.active['w_'+t]);
   if(other){alert('Stop '+other+' first!');return;}
@@ -2954,7 +3037,7 @@ function devBar(dev){
 function renderPva(){
   const body=document.getElementById('pva-body'),sum=document.getElementById('pva-sum');
   if(!body)return;
-  const done=liveItems(S.plan).filter(b=>b.aMin!=null&&b.pMin>0);
+  const done=liveItems(S.plan).filter(b=>isWorkB(b)&&b.aMin!=null&&b.pMin>0);
   const P=done.reduce((s,b)=>s+b.pMin,0),A=done.reduce((s,b)=>s+b.aMin,0);
   const overP=liveItems(S.projects).filter(p=>!p.done&&p.estMin&&projActualMin(p)>p.estMin).length;
   if(sum)sum.innerHTML=(done.length?`${done.length} blocks · <b style="color:${devColor((A-P)/P*100)}">${fmtDev((A-P)/P*100)}</b> vs plan`:'No finished blocks yet')+(overP?` · <span style="color:#e0524d">⚠ ${overP} over budget</span>`:'');
@@ -3157,17 +3240,17 @@ function applyNativeAction(a){
       else if(a.kind==='plan'&&ref){goTab(0);startPlanBlock(ref);}
       break;
     case 'work':{
-      goTab(0);
+      goTab(1);
       const running=WTYPES.find(t=>S.active['w_'+t]);
       const last=(S.sessions[tk()]||[]).slice(-1)[0];
       toggleWork(running||(last&&last.type)||'design');
       break;}
     case 'stop':
-      if(ref.startsWith('w_')){goTab(0);toggleWork(ref.slice(2));}
-      else if(ref==='workout'){goTab(2);openWorkout();}
+      if(ref.startsWith('w_')){goTab(1);toggleWork(ref.slice(2));}
+      else if(ref==='workout'){goTab(3);openWorkout();}
       break;
     case 'workout':
-      goTab(2);
+      goTab(3);
       if(activeWorkout())openWorkout();else wkStart([]);
       break;
     case 'plan':goTab(0);showPlanModal();break;
@@ -5312,6 +5395,328 @@ function stopWorkAdjusted(type){
   window._stopOv={type,startMs:sMs,endMs:eMs};
   stopWork(type,s0);
 }
+
+// ═══ PLAN TAB — whole-day planner (work + life + exercise), optimiser, track record ═══
+const PL_COL={work:'var(--work)',life:'var(--life)',exercise:'var(--ex)'};
+const PL_LIFE=[['meal','🍽','Meal'],['chores','🧹','Chores'],['rest','🛋','Rest'],['social','👥','Social'],['errand','🛒','Errand'],['learn','📚','Learn'],['fun','🎮','Fun'],['buffer','⏳','Buffer'],['sleep','😴','Wind down']];
+const PL_EX_EXTRA=[['Core 100','🔥'],['Cardio','🏃'],['Mobility','🧘']];
+const planCat=b=>(b&&b.cat)||'work';
+const isWorkB=b=>planCat(b)==='work';
+function planIcon(b){
+  const c=planCat(b);
+  if(c==='life'){const o=PL_LIFE.find(x=>x[2]===b.sub);return o?o[1]:'🌿';}
+  if(c==='exercise'){const o=PL_EX_EXTRA.find(x=>x[0]===b.sub);return o?o[1]:'🏋️';}
+  return({design:'✏️',games:'🕹',clients:'👔'})[b.wtype]||'💼';
+}
+let _planInit=false,_histN=7,_histOpen={};
+function planPageShow(){
+  if(!_planInit){_planInit=true;if(tsToMytMin(Date.now())>=17*60)planDate=addDaysKey(tk(),1);}
+  renderPlanCard(true);renderPlanExtras();
+}
+function planGo(delta){planDate=delta===0?null:addDaysKey(tk(),delta);renderPlanCard(true);renderPlanExtras();}
+function renderPlanQuick(){
+  const el=document.getElementById('plan-quick');if(!el)return;
+  const d=pDate(),t=tk();
+  el.innerHTML=[['Yesterday',-1],['Today',0],['Tomorrow',1]].map(([l,n])=>{const on=d===addDaysKey(t,n);
+    return `<button class="plan-chip" style="flex:1;margin:0;${on?'background:#7aa2f7;color:#0b1020;border-color:#7aa2f7;font-weight:700':''}" onclick="planGo(${n})">${l}</button>`;}).join('');
+}
+function renderPlanHeader(){
+  const bs=liveItems(S.plan).filter(b=>b.date===pDate());
+  const by={work:0,life:0,exercise:0};bs.forEach(b=>{by[planCat(b)]+=b.pMin;});
+  const tot=by.work+by.life+by.exercise;
+  const n=document.getElementById('plan-load-num'),s=document.getElementById('plan-load-sub');
+  if(n)n.textContent=tot?fmt(tot):'—';
+  if(s)s.innerHTML=tot?`<span style="color:var(--work)">💼 ${fmt(by.work)}</span> · <span style="color:var(--life)">🌿 ${fmt(by.life)}</span> · <span style="color:var(--ex)">🏋️ ${fmt(by.exercise)}</span>`:'nothing planned';
+}
+function renderPlanExtras(){
+  try{
+    renderPlanQuick();renderPlanHeader();
+    if(curPage===0){renderPlanInsights();renderPlanHistory();}
+  }catch(e){console.warn('plan extras',e);}
+}
+// ----- category-aware modal bits -----
+function plSetCat(cat,sub,fromClick){
+  const g=i=>document.getElementById(i);if(!g('pl-cat'))return;
+  g('pl-cat').value=cat;
+  document.querySelectorAll('#pl-cats button').forEach(bt=>{const c=bt.dataset.cat,on=c===cat;bt.style.background=on?PL_COL[c]:'transparent';bt.style.color=on?'#1a1000':'var(--text)';bt.style.borderColor=PL_COL[c];});
+  g('pl-work-f').style.display=cat==='work'?'':'none';
+  g('pl-life-f').style.display=cat==='work'?'none':'';
+  g('pl-title-lbl').textContent=cat==='work'?'What are you working on?':cat==='life'?'What is it?':'Session';
+  g('pl-title').style.borderColor=PL_COL[cat];
+  if(fromClick&&cat!=='work'&&g('pl-urgent'))g('pl-urgent').checked=false;
+  if(cat!=='work'){
+    const opts=cat==='life'?PL_LIFE.map(o=>[o[2],o[1]]):[...sortedRoutines().map(r=>[r.name,'🏋️']),...PL_EX_EXTRA];
+    let cur=sub!==undefined?sub:g('pl-sub').value;
+    if(!cur&&cat==='exercise'){const r=exPlannedRoutine(g('pl-date').value||pDate());cur=r?r.name:'Core 100';}
+    g('pl-sub-chips').innerHTML=opts.map(([l,i])=>`<button type="button" class="plan-chip" data-sub="${escapeHtml(l)}" onclick="plPickSub(this.dataset.sub)">${i} ${escapeHtml(l)}</button>`).join('');
+    plPickSub(opts.some(o=>o[0]===cur)?cur:'',true);
+  }
+}
+function plPickSub(l,silent){
+  const g=i=>document.getElementById(i);
+  g('pl-sub').value=l;
+  g('pl-sub-chips').querySelectorAll('button').forEach(bt=>{const on=bt.dataset.sub===l,c=PL_COL[g('pl-cat').value];bt.style.background=on?c:'';bt.style.color=on?'#1a1000':'';});
+  const t=g('pl-title');
+  if(l&&(!t.value.trim()||t.dataset.auto==='1')){t.value=l;t.dataset.auto='1';}
+}
+function planNonWorkRight(b,date,today){
+  if(b.aMin!=null)return `<div style="text-align:right"><div style="font-size:13px;font-weight:700;color:#3fa66b">✓ ${fmt(b.aMin)}</div><div style="font-size:9px;color:var(--muted)">${b.aStart}–${b.aEnd}</div></div>`;
+  if(date>today)return `<span style="font-size:11px;color:var(--muted)">${fmt(b.pMin)}</span>`;
+  const st='width:auto;padding:0 10px;height:30px;font-size:12px;font-weight:700;color:'+PL_COL[planCat(b)]+';border-color:'+PL_COL[planCat(b)];
+  return `<div style="display:flex;gap:4px">${planCat(b)==='exercise'?`<button class="plan-mini" style="${st}" onclick="event.stopPropagation();planOpenWorkout('${b.id}')">▶ Go</button>`:''}<button class="plan-mini" style="${st}" onclick="event.stopPropagation();planMarkDone('${b.id}')">✓ Done</button></div>`;
+}
+function planMarkDone(id){
+  const b=liveItems(S.plan).find(x=>x.id===id);if(!b)return;
+  const s=hm2min(b.pStart)||0,pe=s+b.pMin,now=tsToMytMin(Date.now());
+  b.aStart=b.pStart;b.aEnd=min2hm((b.date===tk()&&now>s&&now<pe)?now:pe);b.wasted=0;b.paused=0;b.aMin=actMinOf(b);
+  touchP(b);plannerChanged();
+}
+function planOpenWorkout(id){goTab(3);if(activeWorkout())openWorkout();else wkStart([]);}
+// exercise blocks complete themselves when the matching workout / rest-day core goal is done
+function planSyncExercise(){
+  let ch=false;const today=tk();
+  liveItems(S.plan).filter(b=>planCat(b)==='exercise'&&b.aMin==null&&b.date<=today).forEach(b=>{
+    if(b.sub==='Core 100'){
+      if(exCoreReps(b.date)>=coreTargetFor(b.date)){b.aStart=b.pStart;b.aEnd=min2hm((hm2min(b.pStart)||0)+b.pMin);b.wasted=0;b.paused=0;b.aMin=actMinOf(b);touchP(b);ch=true;}
+      return;
+    }
+    const w=liveW().find(x=>!x.snack&&x.end&&x.start&&x.date===b.date&&(x.exercises||[]).some(en=>en.sets.some(st=>st.done)));
+    if(w){b.aStart=tsToHM(w.start);b.aEnd=tsToHM(w.end);b.wasted=0;b.paused=0;b.aMin=actMinOf(b);touchP(b);ch=true;}
+  });
+  if(ch){save();clearTimeout(planSyncExercise._t);planSyncExercise._t=setTimeout(()=>{if(typeof syncPlanner==='function')syncPlanner();},600);}
+  return ch;
+}
+function planInterleave(blocks,rows,date){
+  let out='',prevEnd=null;
+  blocks.forEach((b,i)=>{
+    const s0=hm2min(b.pStart)||0,e0=s0+b.pMin;
+    if(prevEnd!==null){
+      if(s0<prevEnd)out+=`<div style="font-size:10px;color:#e0524d;padding:3px 0 0 52px">⚠ overlaps the block above by ${fmt(prevEnd-s0)}</div>`;
+      else if(s0-prevEnd>=20)out+=`<div onclick="showPlanModal(null,{start:'${min2hm(prevEnd)}',min:${Math.min(s0-prevEnd,60)}})" style="margin:4px 0 4px 52px;padding:5px 10px;border:1px dashed var(--border);border-radius:8px;font-size:11px;color:var(--muted);cursor:pointer">＋ Free ${fmt(s0-prevEnd)} · ${min2hm(prevEnd)}–${min2hm(s0)}</div>`;
+    }
+    out+=rows[i];
+    prevEnd=Math.max(prevEnd===null?0:prevEnd,e0);
+  });
+  if(prevEnd!==null&&prevEnd<21*60+30)out+=`<div onclick="showPlanModal(null,{start:'${min2hm(prevEnd)}',min:60})" style="margin:6px 0 0 52px;padding:5px 10px;border:1px dashed var(--border);border-radius:8px;font-size:11px;color:var(--muted);cursor:pointer">＋ Free from ${min2hm(prevEnd)} onwards</div>`;
+  return out;
+}
+function renderWorkNext(){
+  const c=document.getElementById('work-next-card'),body=document.getElementById('work-next-body');if(!c||!body)return;
+  const today=tk(),now=tsToMytMin(Date.now());
+  const running=Object.keys(S.active||{}).some(k=>(k.startsWith('w_')||k.startsWith('wp_'))&&S.active[k]&&S.active[k].planId);
+  const cand=liveItems(S.plan).filter(b=>b.date===today&&isWorkB(b)&&b.aMin==null&&!b.aStart).sort((a,b)=>(hm2min(a.pStart)||0)-(hm2min(b.pStart)||0));
+  const nb=cand.find(b=>(hm2min(b.pStart)||0)+b.pMin>now)||cand[0];
+  if(!nb||running){c.style.display='none';return;}
+  c.style.display='';
+  body.innerHTML=`<div style="display:flex;align-items:center;gap:10px"><div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--muted)">${nb.pStart}</div><div style="flex:1;min-width:0;font-size:14px">${escapeHtml(nb.title)}<div style="font-size:10px;color:var(--muted)">${fmt(nb.pMin)}</div></div><button class="plan-mini" style="width:auto;padding:0 14px;height:32px;font-weight:700;color:var(--work);border-color:var(--work)" onclick="startPlanBlock('${nb.id}')">▶ Start</button></div>`;
+}
+// ----- copy / carry over / quick actions -----
+function planCopyFrom(src,date,onlyUnfinished){
+  const bs=liveItems(S.plan).filter(b=>b.date===src&&!b.urgent&&(!onlyUnfinished||b.aMin==null));
+  if(!bs.length){alert('Nothing to copy from that day.');return;}
+  const exist=liveItems(S.plan).filter(b=>b.date===date).length;
+  if(exist&&!confirm(fmtDueDate(date)+' already has '+exist+' block(s). Add '+bs.length+' more?'))return;
+  if(!S.plan)S.plan=[];
+  bs.forEach(o=>{const n={id:uid(),gcalP:null,gcalA:null,deleted:false,created:new Date().toISOString(),title:o.title,cat:planCat(o),sub:o.sub||'',projId:o.projId||null,ptype:o.ptype||'',wtype:o.wtype||'design',date,pStart:o.pStart,pMin:o.pMin,aStart:null,aEnd:null,aMin:null,wasted:0,paused:0,urgent:false};S.plan.push(n);touchP(n);});
+  closeModal();plannerChanged();
+}
+function showCopyModal(){
+  const date=pDate();
+  const opts=[[addDaysKey(date,-1),'The day before'],[addDaysKey(date,-7),'Same weekday, last week'],[tk(),'Today']].filter((o,i,a)=>o[0]!==date&&a.findIndex(x=>x[0]===o[0])===i);
+  const row=o=>{const n=liveItems(S.plan).filter(b=>b.date===o[0]&&!b.urgent).length;return `<button class="plan-btn" style="width:100%;margin-bottom:8px;text-align:left;${n?'':'opacity:.45'}" ${n?`onclick="planCopyFrom('${o[0]}','${date}')"`:''}>${o[1]} · ${fmtDueDate(o[0])} <span style="color:var(--muted)">(${n} blocks)</span></button>`;};
+  showModal(`<h3 style="color:#7aa2f7">📋 Copy a plan into ${fmtDueDate(date)}</h3><div style="font-size:12px;color:var(--muted);margin-bottom:10px">Copies planned blocks (not urgent ones) with their times — actuals start empty.</div>${opts.map(row).join('')}<label class="mlbl">Another day</label><div style="display:flex;gap:8px"><input type="date" id="cp-date" style="flex:1"><button class="plan-btn pri" style="flex:0 0 auto" onclick="const v=document.getElementById('cp-date').value;if(v)planCopyFrom(v,'${date}')">Copy</button></div><div class="mbtns" style="margin-top:10px"><button class="bcanc" onclick="closeModal()">Cancel</button></div>`,null);
+}
+function planQuickAdd(date,cat,sub,start,min,title){
+  if(!S.plan)S.plan=[];
+  const b={id:uid(),gcalP:null,gcalA:null,deleted:false,created:new Date().toISOString(),title:title||sub||'Block',cat,sub:sub||'',projId:null,ptype:'',wtype:'design',date,pStart:start,pMin:min,aStart:null,aEnd:null,aMin:null,wasted:0,paused:0,urgent:false};
+  S.plan.push(b);touchP(b);plannerChanged();
+}
+function planMoveBlock(id,start){const b=liveItems(S.plan).find(x=>x.id===id);if(!b)return;b.pStart=start;touchP(b);plannerChanged();}
+function planSplit(id){
+  const b=liveItems(S.plan).find(x=>x.id===id);if(!b)return;
+  const half=Math.max(15,Math.round(b.pMin/2/5)*5),rest=b.pMin-half;if(rest<10)return;
+  const n={...b,id:uid(),gcalP:null,gcalA:null,created:new Date().toISOString(),pStart:min2hm((hm2min(b.pStart)||0)+half+10),pMin:rest,aStart:null,aEnd:null,aMin:null,wasted:0,paused:0};
+  b.pMin=half;touchP(b);S.plan.push(n);touchP(n);plannerChanged();
+}
+function planApplyBias(date,type){
+  const st=typeStats()[type];if(!st||!st.p)return;const r=st.a/st.p;
+  liveItems(S.plan).filter(b=>b.date===date&&isWorkB(b)&&(b.ptype||'')===type&&b.aMin==null&&!b.aStart).forEach(b=>{b.pMin=Math.max(5,Math.round(b.pMin*r/5)*5);touchP(b);});
+  plannerChanged();
+}
+// earliest slot (>=08:00) that fits `min`, preferring `pref`
+function planFit(blocks,pref,min){
+  const iv=blocks.map(b=>{const s0=hm2min(b.pStart)||0;return[s0,s0+b.pMin];}).sort((a,b)=>a[0]-b[0]);
+  const free=(s0)=>iv.every(([a,b])=>s0+min<=a||s0>=b);
+  if(pref!=null&&free(pref))return pref;
+  for(let s0=8*60;s0+min<=22*60;s0+=15)if(free(s0))return s0;
+  return pref!=null?pref:9*60;
+}
+function planPeakWindow(){
+  const hours=new Array(24).fill(0);let tot=0;const from=addDaysKey(tk(),-30);
+  Object.keys(S.sessions||{}).filter(k=>k>=from).forEach(k=>(S.sessions[k]||[]).forEach(s=>{
+    if(!s.ts||!(s.dur>0))return;
+    const endMs=new Date(s.ts).getTime(),gross=(s.dur||0)+(s.wasted||0);
+    const startMs=s.start?new Date(s.start).getTime():endMs-gross*60000;
+    const span=Math.max(1,(endMs-startMs)/60000);let t=startMs,guard=0;
+    while(t<endMs&&guard++<50){
+      const hm=tsToMytMin(t),h=Math.floor(hm/60),segEnd=Math.min(endMs,t+(60-(hm%60))*60000);
+      const m=(segEnd-t)/60000*(s.dur/span);hours[h]+=m;tot+=m;t=segEnd;
+    }
+  }));
+  if(tot<600)return null;
+  let best=0,bv=-1;for(let h=0;h<23;h++){const v=hours[h]+hours[h+1];if(v>bv){bv=v;best=h;}}
+  return{start:best,share:bv/tot};
+}
+const planHistKeys=n=>Array.from({length:n},(_,i)=>addDaysKey(tk(),-i));
+const workMinOfDay=d=>d?((d.design||0)+(d.games||0)+(d.clients||0)):0;
+function planInsights(date){
+  const out=[],today=tk();
+  const blocks=liveItems(S.plan).filter(b=>b.date===date).sort((a,b)=>(hm2min(a.pStart)||0)-(hm2min(b.pStart)||0));
+  const wk=blocks.filter(isWorkB),target=S.workMin||180;
+  const workP=wk.filter(b=>!b.urgent).reduce((s,b)=>s+b.pMin,0),totalP=blocks.reduce((s,b)=>s+b.pMin,0);
+  const add=(sev,ico,t,d,act)=>out.push({sev,ico,t,d,act});
+  const q=v=>escapeHtml(JSON.stringify(v));
+  const past=planHistKeys(15).slice(1);
+  // history: completion & urgent load
+  const pastBlocks=k=>liveItems(S.plan).filter(b=>b.date===k);
+  let pn=0,pd=0;past.slice(0,7).forEach(k=>pastBlocks(k).filter(b=>!b.urgent).forEach(b=>{pn++;if(b.aMin!=null)pd++;}));
+  const rate=pn>=5?pd/pn:null;
+  let urgMin=0,actDays=0;past.slice(0,14).forEach(k=>{const bs=pastBlocks(k);if(bs.some(b=>b.aMin!=null)||workMinOfDay(S.daily[k])>0)actDays++;bs.filter(b=>b.urgent&&b.aMin!=null&&isWorkB(b)).forEach(b=>{urgMin+=b.aMin;});});
+  const urgPerDay=actDays?urgMin/actDays:0;
+  // 1. overlaps
+  let ov=0,pe=null;blocks.forEach(b=>{const s0=hm2min(b.pStart)||0;if(pe!==null&&s0<pe)ov++;pe=Math.max(pe===null?0:pe,s0+b.pMin);});
+  if(ov)add('warn','⚠️',ov+' overlapping block'+(ov>1?'s':''),'Two things are scheduled at the same time. Shift one of them — the dashed “Free” rows show where there is room.');
+  // 2. packed day
+  if(totalP>660||workP>target*2)add('warn','🔥','This day looks over-packed',`You planned ${fmt(totalP)} in total${workP?` (${fmt(workP)} of work vs a ${fmt(target)} target)`:''}.${rate!==null?` Lately you finish about ${Math.round(rate*100)}% of what you plan.`:''} Cut or move the least important block.`);
+  // 3. late / early
+  if(blocks.length){
+    const last=blocks[blocks.length-1],lastEnd=(hm2min(last.pStart)||0)+last.pMin,first=hm2min(blocks[0].pStart)||0;
+    const sl=past.slice(0,7).map(k=>(S.daily[k]||{}).sleepHours).filter(v=>v>0),avgS=sl.length?sl.reduce((a,b)=>a+b,0)/sl.length:null;
+    if(lastEnd>23*60+30||first<6*60+30)add('warn','🌙','Plan runs very late / very early',`${lastEnd>23*60+30?'Ends at '+min2hm(lastEnd):'Starts at '+min2hm(first)}.${avgS!==null?` Your last ${sl.length} nights averaged ${avgS.toFixed(1)}h (target ${S.sleepTarget||7}h).`:''} Sleep is what the rest of the plan runs on.`);
+  }
+  // 4. under-planned work
+  if(date>=today&&workP<target&&(wk.length||blocks.length<3)){
+    const need=Math.min(240,Math.ceil((target-workP)/15)*15),st=planFit(blocks,10*60,need);
+    add('tip','🎯','Work plan is short of your daily target',`You planned ${fmt(workP)} and the target is ${fmt(target)}. A ${fmt(need)} focus block fits at ${min2hm(st)}.`,['＋ Add focus block',`planQuickAdd(${q(date)},'work','','${min2hm(st)}',${need},'Focus block')`]);
+  }
+  // 5. carry-over from the day before
+  const prev=addDaysKey(date,-1),unf=liveItems(S.plan).filter(b=>b.date===prev&&!b.urgent&&b.aMin==null&&prev<=today);
+  if(unf.length&&date>prev)add('tip','↪️',unf.length+' block'+(unf.length>1?'s':'')+' from '+fmtDueDate(prev)+' not done',unf.slice(0,3).map(b=>escapeHtml(b.title)).join(', ')+(unf.length>3?' …':'')+'. Move them here or drop them on purpose.',['Carry over',`planCopyFrom(${q(prev)},${q(date)},true)`]);
+  // 6. completion rate
+  if(rate!==null&&rate<0.7)add('tip','📉','You finish '+Math.round(rate*100)+'% of what you plan',`Over the last 7 days ${pd} of ${pn} planned blocks got done. Plan ~${Math.round((1-rate)*100)}% less, or give blocks more room — it beats carrying things over daily.`);
+  // 7. exercise
+  if(!blocks.some(b=>planCat(b)==='exercise')){
+    const r=exPlannedRoutine(date);
+    const ws=liveW().filter(w=>!w.snack&&w.end&&w.start).map(w=>tsToMytMin(w.start)).sort((a,b)=>a-b);
+    const pref=ws.length?ws[Math.floor(ws.length/2)]:18*60;
+    if(r){const st=planFit(blocks,Math.round(pref/15)*15,60);add('tip','🏋️','Training day, no workout scheduled',`${escapeHtml(r.name)} is planned for this weekday. ${ws.length?'You usually train around '+min2hm(Math.round(pref/15)*15)+'.':''}`,['＋ Add '+escapeHtml(r.name),`planQuickAdd(${q(date)},'exercise',${q(r.name)},'${min2hm(st)}',60,${q(r.name)})`]);}
+    else {const st=planFit(blocks,20*60,15);add('tip','🔥','Rest day — keep the streak',`Do ${coreTargetFor(date)} core reps today. Put it in the plan so it does not get forgotten.`,['＋ Add Core 100',`planQuickAdd(${q(date)},'exercise','Core 100','${min2hm(st)}',15,'Core 100')`]);}
+  }
+  // 8. lunch
+  if(wk.length&&!blocks.some(b=>planCat(b)==='life'&&b.sub==='Meal'&&(hm2min(b.pStart)||0)<15*60&&(hm2min(b.pStart)||0)+b.pMin>11*60)){
+    const spans=blocks.some(b=>(hm2min(b.pStart)||0)<12*60&&(hm2min(b.pStart)||0)+b.pMin>13*60||((hm2min(b.pStart)||0)<12*60+30&&(hm2min(b.pStart)||0)+b.pMin>12*60+30));
+    if(spans||wk.reduce((s,b)=>s+b.pMin,0)>240){const st=planFit(blocks,12*60+30,45);add('tip','🍽','No meal planned',`Plan a proper lunch break so the afternoon block doesn’t start on empty.`,['＋ Add lunch',`planQuickAdd(${q(date)},'life','Meal','${min2hm(st)}',45,'Lunch')`]);}
+  }
+  // 9. best focus window
+  const pk=planPeakWindow();
+  if(pk&&wk.length){
+    const big=wk.filter(b=>!b.urgent&&b.aMin==null).sort((a,b)=>b.pMin-a.pMin)[0];
+    if(big&&big.pMin>=60){const ms=(hm2min(big.pStart)||0)+big.pMin/2,mid=pk.start*60+60;
+      if(Math.abs(ms-mid)>150)add('tip','⏱','Your best focus window is '+pad(pk.start)+':00–'+pad(pk.start+2)+':00',`${Math.round(pk.share*100)}% of your tracked work (last 30 days) happens then. “${escapeHtml(big.title)}” (${fmt(big.pMin)}) is at ${big.pStart} — try the big one in the peak window.`,['Move to '+pad(pk.start)+':00',`planMoveBlock(${q(big.id)},'${pad(pk.start)}:00')`]);}
+  }
+  // 10. estimation bias
+  const ts=typeStats();let worst=null;
+  wk.filter(b=>b.aMin==null&&!b.aStart&&!b.urgent).forEach(b=>{const k=b.ptype||'';const st=ts[k];if(!k||!st||st.n<3||!st.p)return;const r=st.a/st.p;if(Math.abs(r-1)>0.2&&(!worst||Math.abs(r-1)>Math.abs(worst.r-1)))worst={k,r,n:st.n};});
+  if(worst)add('tip','📏','“'+escapeHtml(worst.k)+'” tasks take ×'+worst.r.toFixed(2)+' of your estimate',`Based on ${worst.n} finished blocks. Scale this day’s “${escapeHtml(worst.k)}” estimates to match reality.`,['Adjust estimates',`planApplyBias(${q(date)},${q(worst.k)})`]);
+  // 11. buffer for urgent work
+  if(urgPerDay>=20&&actDays>=3&&!blocks.some(b=>b.sub==='Buffer')){
+    const st=planFit(blocks,15*60,Math.round(urgPerDay/15)*15||30),m=Math.max(15,Math.round(urgPerDay/15)*15);
+    add('tip','⚡','Urgent tasks eat ~'+fmt(Math.round(urgPerDay))+' a day',`That is the average over your last ${actDays} active days. Reserve a floating buffer so interruptions don’t push everything else out.`,['＋ Add '+fmt(m)+' buffer',`planQuickAdd(${q(date)},'life','Buffer','${min2hm(st)}',${m},'Buffer for urgent tasks')`]);
+  }
+  // 12. long blocks
+  const longB=wk.filter(b=>b.pMin>=150&&b.aMin==null&&!b.aStart)[0];
+  if(longB)add('tip','✂️','“'+escapeHtml(longB.title)+'” is a '+fmt(longB.pMin)+' block','Long unbroken blocks usually slip. Split it in two with a short break in between.',['Split with a break',`planSplit(${q(longB.id)})`]);
+  // 13. back-to-back
+  let b2b=0;blocks.forEach((b,i)=>{if(i&&((hm2min(b.pStart)||0)-((hm2min(blocks[i-1].pStart)||0)+blocks[i-1].pMin))===0)b2b++;});
+  if(b2b>=3)add('tip','🧱',b2b+' blocks start the second the last one ends','No gaps means one overrun shifts the whole day. Leave 5–10 minutes between blocks.');
+  // 14. wind-down
+  if(blocks.length&&!blocks.some(b=>b.sub==='Wind down')){
+    const bed=past.slice(0,7).map(k=>(S.daily[k]||{}).sleepTime).filter(Boolean).map(hm2min).filter(v=>v!=null).map(v=>v<12*60?v+1440:v).sort((a,b)=>a-b);
+    const bedM=bed.length?bed[Math.floor(bed.length/2)]:23*60+30,st=Math.max(18*60,bedM-30);
+    add('tip','😴','Schedule a wind-down',`You usually go to bed around ${min2hm(bedM)}. A 30 minute screen-free wind-down at ${min2hm(st)} protects your sleep streak.`,['＋ Add wind-down',`planQuickAdd(${q(date)},'life','Wind down','${min2hm(st%1440)}',30,'Wind down')`]);
+  }
+  if(!blocks.length)return[{sev:'tip',ico:'📝',t:'Start with the big three',d:'Add 1–3 must-do work blocks first, then your workout and a meal break. Or copy a previous day with “Copy day”.',act:['📋 Copy a day','showCopyModal()']}];
+  if(!out.length)add('ok','✅','This plan looks balanced','Work target covered, breaks and exercise in place, no overlaps. Check the track record on the right to see how it compares to what you usually finish.');
+  const order={warn:0,tip:1,ok:2};out.sort((a,b)=>order[a.sev]-order[b.sev]);
+  return out.slice(0,8);
+}
+function renderPlanInsights(){
+  const el=document.getElementById('plan-insights');if(!el)return;
+  el.innerHTML=planInsights(pDate()).map(i=>`<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="font-size:18px;line-height:1.2">${i.ico}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:${i.sev==='warn'?'#e0a030':'var(--text)'}">${i.t}</div><div style="font-size:12px;color:var(--muted);line-height:1.5;margin-top:2px">${i.d}</div>${i.act?`<button class="plan-chip" style="margin-top:6px" onclick="${escapeHtml(i.act[1])}">${i.act[0]}</button>`:''}</div></div>`).join('');
+}
+// ----- track record (what you actually did) -----
+function planDayActs(k){
+  const rows=teEntries(k).map(r=>({...r,kind:r.src==='work'?'work':r.src==='snake'?'exercise':'life'}));
+  const wks=liveW().filter(w=>!w.snack&&w.end&&w.start&&w.date===k&&(w.exercises||[]).some(en=>en.sets.some(st=>st.done)));
+  wks.forEach(w=>rows.push({src:'wk',kind:'exercise',icon:'🏋️',label:w.name||'Workout',startMs:w.start,endMs:w.end,dur:Math.round((w.end-w.start)/60000),wasted:0}));
+  liveItems(S.plan).filter(b=>b.date===k&&!isWorkB(b)&&b.aMin!=null).forEach(b=>{
+    if(planCat(b)==='exercise'&&b.sub!=='Core 100'&&wks.length)return;
+    rows.push({src:'plan',kind:planCat(b),icon:planIcon(b),label:b.title,startMs:msFromHM(k,b.aStart),endMs:msFromHM(k,b.aEnd)+(hm2min(b.aEnd)<=hm2min(b.aStart)?86400000:0),dur:b.aMin,wasted:0});
+  });
+  const dd=S.daily[k],pv=S.daily[addDaysKey(k,-1)];
+  if(dd&&dd.wakeTime&&pv&&pv.sleepTime){
+    const sm=hm2min(pv.sleepTime);const sMs=msFromHM(sm<12*60?k:addDaysKey(k,-1),pv.sleepTime),eMs=msFromHM(k,dd.wakeTime),h=(eMs-sMs)/3600000;
+    if(h>1&&h<16)rows.push({src:'sleep',kind:'sleep',icon:'😴',label:'Sleep',startMs:sMs,endMs:eMs,dur:Math.round(h*60),wasted:0});
+  }
+  return rows.sort((a,b)=>(a.startMs==null?1e15:a.startMs)-(b.startMs==null?1e15:b.startMs));
+}
+const HIST_COL={work:'var(--work)',life:'var(--life)',exercise:'var(--ex)',sleep:'var(--muted)'};
+function histTrack(k,acts){
+  const d0=msFromHM(k,'00:00'),pc=ms=>Math.max(0,Math.min(100,(ms-d0)/864000));
+  const seg=(s0,e0,col,extra)=>{const l=pc(s0),w=Math.max(.5,pc(e0)-l);return `<div style="position:absolute;left:${l}%;width:${w}%;top:0;bottom:0;border-radius:3px;${extra||('background:'+col)}"></div>`;};
+  const plan=liveItems(S.plan).filter(b=>b.date===k).map(b=>{const s0=d0+(hm2min(b.pStart)||0)*60000,c=PL_COL[planCat(b)];return seg(s0,s0+b.pMin*60000,c,`border:1.5px solid ${c};background:color-mix(in srgb,${c} 15%,transparent)`);}).join('');
+  const done=acts.filter(a=>a.startMs!=null&&a.endMs!=null).map(a=>seg(a.startMs,a.endMs,HIST_COL[a.kind],`background:${HIST_COL[a.kind]};${a.kind==='sleep'?'opacity:.35':''}`)).join('');
+  const ticks=[6,12,18].map(h=>`<div style="position:absolute;left:${h/24*100}%;top:0;bottom:-11px;border-left:1px dashed var(--border);font-size:8px;color:var(--muted);padding-left:2px">${h}</div>`).join('');
+  const lane=(l,i)=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="width:30px;font-size:8px;font-weight:700;color:var(--muted)">${l}</span><div style="position:relative;flex:1;height:13px">${i}</div></div>`;
+  return `<div style="position:relative;margin:8px 0 14px"><div style="position:absolute;left:36px;right:0;top:0;bottom:0">${ticks}</div>${lane('PLAN',plan)}${lane('DONE',done)}</div>`;
+}
+function histToggle(k){_histOpen[k]=!_histOpen[k];renderPlanHistory();}
+function histSet(n){_histN=n;renderPlanHistory();}
+function histDayHtml(k){
+  const d=S.daily[k]||{},target=S.workMin||180,today=tk();
+  const acts=planDayActs(k),bl=liveItems(S.plan).filter(b=>b.date===k);
+  const planned=bl.filter(b=>!b.urgent),done=planned.filter(b=>b.aMin!=null),urg=bl.filter(b=>b.urgent);
+  const wkm=workMinOfDay(d),hasEx=exDayHit(k);
+  const chip=(t,col)=>`<span style="font-size:11px;font-weight:700;color:${col};white-space:nowrap">${t}</span>`;
+  const chips=[chip('💼 '+fmt(Math.round(wkm)),wkm>=target?'#3fa66b':'var(--muted)'),chip('🏋️ '+(hasEx?'✓':'—'),hasEx?'#3fa66b':'var(--muted)'),d.sleepHours?chip('😴 '+d.sleepHours+'h','var(--muted)'):'',planned.length?chip('📋 '+done.length+'/'+planned.length,done.length===planned.length?'#3fa66b':'var(--muted)'):'',urg.length?chip('⚡ '+urg.length,'#e0a030'):''].filter(Boolean).join(' ');
+  const hm=ms=>ms==null?'??:??':tsToHM(ms);
+  const list=acts.map(a=>`<div style="display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:12px"><span style="width:92px;flex-shrink:0;font-family:'Space Mono',monospace;font-size:10px;color:var(--muted)">${hm(a.startMs)}–${hm(a.endMs)}</span><span style="flex:1;min-width:0;color:var(--text)"><span style="color:${HIST_COL[a.kind]}">●</span> ${a.icon} ${escapeHtml(a.label)}</span><span style="color:var(--muted);flex-shrink:0">${fmt(Math.round(a.dur))}</span></div>`).join('')||'<div style="font-size:12px;color:var(--muted)">No timed entries.</div>';
+  const miss=planned.filter(b=>b.aMin==null&&k<today);
+  const missH=miss.length?`<div style="margin-top:6px;font-size:11px;color:#e0a030;line-height:1.5">Planned, not done: ${miss.map(b=>escapeHtml(b.title)).join(' · ')}</div>`:'';
+  const sums={work:0,life:0,exercise:0};acts.forEach(a=>{if(sums[a.kind]!==undefined)sums[a.kind]+=a.dur;});
+  const tot=`<div style="font-size:11px;color:var(--muted);margin-top:4px">Tracked: <span style="color:var(--work)">💼 ${fmt(Math.round(sums.work))}</span> · <span style="color:var(--life)">🌿 ${fmt(Math.round(sums.life))}</span> · <span style="color:var(--ex)">🏋️ ${fmt(Math.round(sums.exercise))}</span></div>`;
+  return `<div class="hist-day${_histOpen[k]?' open':''}"><div class="hist-hd" onclick="histToggle('${k}')"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13px;font-weight:700;color:var(--text)">${k===today?'Today · ':''}${fmtDueDate(k)}</span><span style="display:flex;gap:8px;flex-wrap:wrap">${chips}</span></div>${histTrack(k,acts)}</div><div class="hist-det">${list}${missH}${tot}<div style="margin-top:8px"><button class="plan-chip" onclick="event.stopPropagation();showTimeEditor('${k}')">✎ Edit times</button> <button class="plan-chip" onclick="event.stopPropagation();planGo(${Math.round((new Date(k+'T00:00:00Z')-new Date(tk()+'T00:00:00Z'))/864e5)})">Open this day’s plan</button></div></div></div>`;
+}
+function renderPlanHistory(){
+  const rng=document.getElementById('hist-range'),st=document.getElementById('hist-stats'),days=document.getElementById('hist-days');
+  if(!days)return;
+  rng.innerHTML=[7,14,30].map(n=>`<button class="plan-chip" style="margin:0;${n===_histN?'background:#7aa2f7;color:#0b1020;border-color:#7aa2f7;font-weight:700':''}" onclick="histSet(${n})">${n}d</button>`).join('');
+  const keys=planHistKeys(_histN),past=keys.slice(1),target=S.workMin||180;
+  let wsum=0,hit=0,pn=0,pd=0,um=0,un=0,exh=0,sl=0,sn=0;const cat={work:0,life:0,exercise:0};
+  past.forEach(k=>{
+    const d=S.daily[k]||{},w=workMinOfDay(d);wsum+=w;if(w>=target)hit++;
+    liveItems(S.plan).filter(b=>b.date===k).forEach(b=>{if(b.urgent){un++;if(b.aMin!=null)um+=b.aMin;}else{pn++;if(b.aMin!=null)pd++;}});
+    if(exDayHit(k))exh++;if(d.sleepHours>0){sl+=d.sleepHours;sn++;}
+    planDayActs(k).forEach(a=>{if(cat[a.kind]!==undefined)cat[a.kind]+=a.dur;});
+  });
+  const n=Math.max(1,past.length),tc=cat.work+cat.life+cat.exercise||1;
+  const box=(v,l,c)=>`<div class="pl-stat"><b style="color:${c||'var(--text)'}">${v}</b><span>${l}</span></div>`;
+  st.innerHTML=`<div class="pl-statgrid">${box(fmt(Math.round(wsum/n)),'avg work / day','var(--work)')}${box(hit+'/'+past.length,'days at work target')}${box(pn?Math.round(pd/pn*100)+'%':'—','plan completed',pn&&pd/pn>=.8?'#3fa66b':'#e0a030')}${box(un?fmt(Math.round(um/n)):'0m','urgent / day','#e0a030')}${box(exh+'/'+past.length,'exercise goal','var(--ex)')}${box(sn?(sl/sn).toFixed(1)+'h':'—','avg sleep','var(--life)')}</div>
+  <div style="display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--bg4);margin-bottom:4px"><div style="width:${cat.work/tc*100}%;background:var(--work)"></div><div style="width:${cat.life/tc*100}%;background:var(--life)"></div><div style="width:${cat.exercise/tc*100}%;background:var(--ex)"></div></div>
+  <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Tracked time (excl. sleep): <span style="color:var(--work)">💼 ${fmt(Math.round(cat.work))}</span> · <span style="color:var(--life)">🌿 ${fmt(Math.round(cat.life))}</span> · <span style="color:var(--ex)">🏋️ ${fmt(Math.round(cat.exercise))}</span> over ${past.length} days</div>`;
+  days.innerHTML=keys.map(histDayHtml).join('');
+}
+document.addEventListener('DOMContentLoaded',()=>{try{const c=container();c.style.transition='none';goTab(1);requestAnimationFrame(()=>requestAnimationFrame(()=>{c.style.transition='';}));}catch(e){console.warn(e);}});
 
 // ═══ LIVE TICK ═══
 let _entWarn10Sent=false; // reset each day

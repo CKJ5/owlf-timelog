@@ -8,3 +8,6 @@
 - Paused work sessions live in `S.active['wp_<planId>']`; running ones in `S.active['w_<type>']`.
 - Exercise goal (from `S.exRuleFrom`): training day = finish the planned routine (formal workout), rest day = 100 core snack reps (`exTarget`). Use `exDayHit(dateKey)`; never compare `exTotal` to a target. Older days keep the old rule.
 - Recorded times can be edited later via `showTimeEditor(dateKey)` (daily report → "Edit recorded times"); work sessions store `start`/`ts` (ISO). The Stop dialog's 🔧 uses `window._stopOv` to override start/end.
+- Tabs (left→right): Plan(0) Work(1) Life(2) Exercise(3) Reports(4). `goTab(i)` uses these indexes; page width is 20% of #page-container.
+- Plan blocks (`S.plan`) have `cat` = work | life | exercise (missing = work) and `sub` for life/exercise. Only work blocks feed the estimate stats (`isWorkB`). Exercise blocks auto-complete from the matching workout / rest-day core goal (`planSyncExercise`).
+- Plan tab optimiser = `planInsights(date)`; track record = `renderPlanHistory()` (reuses `teEntries` from the time editor).

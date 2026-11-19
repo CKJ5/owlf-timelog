@@ -2424,7 +2424,7 @@ let rCalYear=yk();  // year shown in monthly/yearly calendar
 
 function goTab(idx){
   curPage=idx;
-  container().style.transform=`translateX(-${idx*20}%)`;
+  container().style.transform=`translateX(-${idx*100/(document.querySelectorAll('#page-container > .page').length||5)}%)`;
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
   updateTopStreak();
   if(idx===0)planPageShow();
@@ -8116,8 +8116,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   switchReport('daily');
   updateWorkUI();updateLifeUI();updateExUI();
   updateActiveNotifications();
-  document.getElementById('page-container').style.width=(4*100)+'%';
-  document.querySelectorAll('.page').forEach(p=>p.style.width='25%');
+  {const pgs=document.querySelectorAll('#page-container > .page'),n=pgs.length||1;
+   document.getElementById('page-container').style.width=(n*100)+'%';
+   pgs.forEach(p=>p.style.width=(100/n)+'%');}   // derived from the real page count — never hard-code it
 });
 
   function calcCleanStreak(){
